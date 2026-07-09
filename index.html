@@ -1,0 +1,756 @@
+<!--
+  LTF OS — Learn To Fly operations shell (prototype)
+  Training / reference aid — not an operational authority.
+  Figures are for cross-checking a student's own plan. The instructor
+  verifies every solo independently against current ERSA/charts and LTF
+  procedures before authorising. Self-contained: no libraries, no storage.
+-->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LTF OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  /* MODULAR GRID — base unit 4px, everything below is a multiple of it.
+     Rule used to snap every legacy spacing value onto this grid: round to
+     the nearest 4px; on an exact tie, round UP for spacing (padding/margin/
+     gap) and DOWN for border-radius. Two deliberate exceptions, left off
+     the grid on purpose: (1) small circular "point" indicators (status
+     dots, verdict dots, map legend swatches) form their own point-size
+     hierarchy rather than being forced onto the structural grid; (2) the
+     header brand SVG's 32x21 stays as-is since it's the traced logo's
+     actual aspect ratio, not a layout choice. Nothing inside an <svg>
+     viewBox or the JS chart coordinate math (P.ox/P.oy/P.w/P.h, W/H) was
+     touched — those are computational, not stylistic. */
+  :root{
+    --deep:#183c84; --blue:#2f8fd1; --sky:#24a8d8; --navy:#18246c;
+    --ink:#eef2fa; --text:#c7d0e2; --dim:#8b96ac; --faint:#5b6478;
+    --bg:#0b0e15; --panel:#12161f; --panel2:#171d2a; --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.05);
+    --green:#22c55e; --red:#f2554c; --amber:#f5a623; --orange:#f47b20;
+    --shadow:none;
+    --font-ui:'Geist',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:'Geist Mono','JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
+    --u1:4px; --u2:8px; --u3:12px; --u4:16px; --u5:20px; --u6:24px; --u7:28px; --u8:32px;
+    --r1:4px; --r2:8px; /* border-radius scale — 2 steps is enough, circles stay 50% */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  /* Every scrollbar in the app — page included — uses this same thin, rounded,
+     sky-accent-on-dark-track treatment. One rule, applies everywhere, so a
+     scroller never looks like an unstyled default regardless of where it shows up. */
+  *{scrollbar-width:thin; scrollbar-color:rgba(36,168,216,.5) var(--panel2)}
+  ::-webkit-scrollbar{width:7px; height:7px}
+  ::-webkit-scrollbar-track{background:var(--panel2)}
+  ::-webkit-scrollbar-thumb{background:rgba(36,168,216,.5); border-radius:var(--r2)}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(36,168,216,.75)}
+  body{background:var(--bg); color:var(--text);
+    font-family:var(--font-ui); -webkit-font-smoothing:antialiased;}
+  button{font-family:inherit}
+  .num,.mono,td.mono,.wbtot,input[type=number]{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+
+  /* SPLASH */
+  #splash{position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); transition:opacity .55s ease, visibility .55s;}
+  #splash.gone{opacity:0; visibility:hidden}
+  .logo{width:190px; overflow:visible}
+  .logo svg{width:100%; overflow:visible; display:block}
+  #plane{opacity:0; animation:planeIn .55s ease .15s forwards, planeOut 1s cubic-bezier(.5,0,.35,1) 1.25s forwards;}
+  #word{opacity:0; animation:fadeUp .6s ease .5s forwards}
+  @keyframes planeIn{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes planeOut{from{transform:translateX(0)}to{transform:translateX(520px);opacity:0}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  #trace{animation:traceDraw .8s ease 1.1s forwards}
+  @keyframes traceDraw{to{stroke-dashoffset:0}}
+
+
+  /* SHELL */
+  #app{opacity:0; transition:opacity .5s ease; min-height:100vh; display:flex; flex-direction:column}
+  #app.on{opacity:1}
+  header.top{display:flex; align-items:center; gap:var(--u5); padding:0 var(--u6); height:60px;
+    background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20}
+  .brand{display:flex; align-items:center; gap:var(--u2); font-weight:800; font-size:16px; letter-spacing:-.2px; color:var(--ink)}
+  .brand .os{color:var(--sky)}
+  .brand svg{width:32px; height:21px; overflow:visible} /* traced logo aspect ratio — not a grid value, do not change */
+  nav.tabs{display:flex; gap:var(--u1); height:100%}
+  nav.tabs button{background:transparent; border:none; color:var(--dim); padding:0 var(--u4); height:100%;
+    font-size:13px; font-weight:600; cursor:pointer; transition:.15s; box-shadow:inset 0 -2px 0 transparent}
+  nav.tabs button:hover{color:var(--text)}
+  nav.tabs button.active{color:var(--sky); box-shadow:inset 0 -2px 0 var(--sky)}
+
+  .subtabs{display:flex; gap:var(--u4); margin:var(--u5) 0 var(--u5); border-bottom:1px solid var(--line);
+    position:sticky; top:60px; background:var(--bg); z-index:15; padding-top:var(--u2)}
+  .subtabs button{background:transparent; border:none; color:var(--dim); padding:0 0 var(--u2);
+    font-size:12.5px; font-weight:600; cursor:pointer; transition:.15s; box-shadow:inset 0 -2px 0 transparent}
+  .subtabs button:hover{color:var(--text)}
+  .subtabs button.active{color:var(--sky); box-shadow:inset 0 -2px 0 var(--sky)}
+  .subview{scroll-margin-top:112px}
+  .subview + .subview{margin-top:var(--u8); padding-top:var(--u6); border-top:1px solid var(--line)}
+  .subhead{font-size:15px; font-weight:700; color:var(--ink); margin-bottom:var(--u4)}
+  .userchip{margin-left:auto; font-size:12px; color:var(--faint); display:flex; align-items:center; gap:var(--u2); letter-spacing:.2px}
+  .userchip .dot{width:6px;height:6px;border-radius:50%;background:var(--green)} /* point-scale exception */
+
+  main{flex:1; padding:var(--u7) var(--u6); max-width:1120px; margin:0 auto; width:100%}
+  .view{display:none}
+  .view.show{display:block; animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+  h1.title{font-size:21px; font-weight:700; margin:0 0 var(--u1); letter-spacing:-.2px; color:var(--ink)}
+  p.sub{color:var(--faint); font-size:13px; margin:0 0 var(--u6)}
+
+  .banner{padding:var(--u3) var(--u4); border-radius:var(--r1); font-size:12.5px; line-height:1.55;
+    background:var(--panel2); border-left:3px solid var(--amber); color:var(--text); margin-bottom:var(--u5)}
+  .banner b{color:var(--amber)}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:var(--u4)}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u5);
+    cursor:pointer; transition:.15s; position:relative; box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  .card:hover{border-color:rgba(36,168,216,.4)}
+  .card .ic{width:36px;height:36px;border-radius:var(--r2);display:flex;align-items:center;justify-content:center;
+    font-size:17px; background:var(--panel2); color:var(--sky); margin-bottom:var(--u3)}
+  .card h3{margin:0 0 var(--u1); font-size:14.5px; color:var(--ink)}
+  .card p{margin:0; font-size:12.5px; color:var(--dim); line-height:1.45}
+  .card .status{position:absolute; top:var(--u5); right:var(--u5); font-size:9px; letter-spacing:.6px;
+    text-transform:uppercase; font-weight:700; display:flex; align-items:center; gap:var(--u1)}
+  .card .status::before{content:"";width:6px;height:6px;border-radius:50%;display:block} /* point-scale exception */
+  .st-live{color:var(--green)} .st-live::before{background:var(--green)}
+  .st-soon{color:var(--faint)} .st-soon::before{background:var(--faint)}
+
+  .twocol{display:grid; grid-template-columns:292px 1fr; gap:var(--u4); align-items:start}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u5);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04); transition:border-color .25s, box-shadow .25s}
+  .panel.envfail{border-color:rgba(242,85,76,.55); box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 1px rgba(242,85,76,.12)}
+  .plabel{font-size:10.5px; letter-spacing:1.2px; text-transform:uppercase; color:var(--faint); font-weight:700; margin-bottom:var(--u4)}
+  label.f{display:block; margin-bottom:var(--u3)}
+  label.f span{display:block; font-size:12.5px; color:var(--dim); margin-bottom:var(--u2); font-weight:500}
+  input,select{width:100%; background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:var(--r1); padding:var(--u3); font-size:15px; font-weight:600; transition:.15s}
+  input:focus,select:focus{outline:none; border-color:var(--sky); box-shadow:0 0 0 3px rgba(36,168,216,.15)}
+  .hint{font-size:11.5px; color:var(--dim); margin-top:var(--u1); font-weight:600}
+
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th{text-align:left; padding:var(--u2); color:var(--faint); font-size:10.5px; text-transform:uppercase;
+    letter-spacing:.4px; border-bottom:1px solid var(--line); font-weight:700}
+  td{padding:var(--u2); border-bottom:1px solid var(--line2); color:var(--text)}
+  .num{text-align:right; font-variant-numeric:tabular-nums}
+  .bold{font-weight:700; color:var(--ink)}
+  tr.tot{background:rgba(244,123,32,.07)}
+  tr.sub{background:var(--panel2)}
+
+  .checks{margin-top:var(--u4); display:flex; flex-direction:column; gap:var(--u2)}
+  .chk{display:flex; align-items:center; gap:var(--u2); font-size:13px}
+  .chk .i{width:15px; flex:0 0 auto; display:flex; align-items:center; justify-content:center} /* icon-holder, point-scale exception */
+
+  table.fptable input{width:100%; max-width:76px; padding:var(--u1) var(--u2); font-size:12.5px; font-weight:700;
+    text-align:right; background:var(--panel2); border:1px solid var(--line); border-radius:var(--r1);
+    color:var(--ink); font-family:var(--font-mono)}
+  table.fptable input:focus{outline:none; border-color:var(--sky); box-shadow:0 0 0 2px rgba(36,168,216,.15)}
+  table.fptable th.num, table.fptable td.num{width:1%}
+  .fphint{font-size:10px; color:var(--faint); font-weight:500; margin-top:var(--u1); line-height:1.4; max-width:280px}
+
+  .fpstats{display:flex; gap:var(--u3); margin-top:var(--u4); flex-wrap:wrap}
+  .fpstat{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3) var(--u4); flex:1;
+    min-width:152px; box-shadow:inset 0 1px 0 rgba(255,255,255,.04); transition:border-color .25s}
+  .fpstat .lbl{font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--faint); font-weight:700; margin-bottom:var(--u2)}
+  .fpstat .val{font-size:19px; font-weight:800; font-family:var(--font-mono); color:var(--ink)}
+  .fpstat.bad{border-color:rgba(242,85,76,.5)} .fpstat.bad .val{color:var(--red)}
+  .fpstat.good .val{color:var(--green)}
+
+  .verdict{display:flex; align-items:center; gap:var(--u4); margin-top:var(--u5); padding:var(--u4) var(--u5); border-radius:var(--r2); border:1px solid;
+    transition:background-color .3s ease, border-color .3s ease}
+  .vdot{width:10px;height:10px;border-radius:50%;flex:0 0 auto} /* point-scale exception */
+  .vlabel{font-size:13.5px; font-weight:800; letter-spacing:.5px}
+  .vsub{font-size:12.5px; color:var(--dim); margin-top:var(--u1)}
+  .vbtn{margin-left:auto; border:none; border-radius:var(--r1); padding:var(--u3) var(--u5); font-weight:700; font-size:13px; color:#fff; background:var(--deep); cursor:pointer; white-space:nowrap}
+
+  .maplayout{display:grid; grid-template-columns:240px 1fr; gap:var(--u4); align-items:start}
+  .navmenu{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3); box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  .navmenu .search{margin-bottom:var(--u3)}
+  .navitem{padding:var(--u3); border-radius:var(--r1); cursor:pointer; font-size:13px; color:var(--dim);
+    display:flex; justify-content:space-between; align-items:center; transition:.12s; font-weight:600}
+  .navitem:hover{background:var(--panel2); color:var(--text)}
+  .navitem.active{background:rgba(36,168,216,.12); color:var(--sky)}
+  .navitem small{font-size:10.5px; opacity:.75; font-weight:500}
+  .maparea{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u4); position:relative; box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  #map{width:100%; display:block; border-radius:var(--r1); background:#0a1526}
+  .maptop{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:var(--u3); padding:0 var(--u1)}
+  .maptop .rname{font-weight:700; font-size:16px; color:var(--ink)}
+  .maptop .rmeta{font-size:12.5px; color:var(--dim)}
+  .leglist{margin-top:var(--u3)}
+  .maplegend{position:absolute; top:56px; right:var(--u6); font-size:10.5px; color:var(--dim);
+    background:rgba(18,22,31,.92); padding:var(--u2) var(--u3); border-radius:var(--r1); line-height:1.8; border:1px solid var(--line)}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle} /* point-scale exception */
+
+  .foot{padding:var(--u5); text-align:center; font-size:11px; color:var(--faint); border-top:1px solid var(--line)}
+
+  .roadmap{display:flex; gap:0; overflow-x:auto; padding:var(--u3) var(--u1) var(--u5); margin-top:var(--u1); scroll-behavior:smooth}
+  .rmnode{flex:1 0 180px; max-width:212px; position:relative; padding-right:var(--u5)}
+  .rmline{position:absolute; top:12px; left:28px; right:0; height:1px; background:var(--line)}
+  .rmnode:last-child .rmline{display:none}
+  .rmnode.live .rmline{background:rgba(36,168,216,.35)}
+  .rmdot{width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; /* point-scale exception, matches its own numbered-marker hierarchy */
+    font-size:11px; font-weight:800; background:var(--panel2); color:var(--faint); border:1px solid var(--line);
+    position:relative; z-index:1}
+  .rmnode.live .rmdot{background:var(--sky); color:#04202e; border-color:var(--sky); animation:rmpulse 2.6s ease-in-out infinite}
+  @keyframes rmpulse{0%,100%{box-shadow:0 0 0 0 rgba(36,168,216,.45)}50%{box-shadow:0 0 0 5px rgba(36,168,216,0)}}
+  .rmnode.live{cursor:pointer}
+  .rmcard{margin-top:var(--u3); padding-right:var(--u2)}
+  .rmtitle{font-size:13px; font-weight:700; color:var(--ink)}
+  .rmdesc{font-size:11.5px; color:var(--dim); margin-top:var(--u1); line-height:1.45}
+  .rmstatus{font-size:9px; text-transform:uppercase; letter-spacing:.6px; font-weight:700; margin-top:var(--u2)}
+
+  /* QUICK LINKS — external references (Linktree directory). Deliberately plainer
+     than .card/.roadmap: no panel background, no border, no hover-lift — this is
+     a link list, not a system, and shouldn't be dressed up as one (see context
+     doc section 11, "reference/library" category). */
+  .linkgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:var(--u6) var(--u5); margin-top:var(--u2)}
+  .linkcat-title{font-size:10.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--faint); font-weight:700; margin-bottom:var(--u2)}
+  .linklist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column}
+  .linklist li{border-top:1px solid var(--line2)}
+  .linklist li:first-child{border-top:none}
+  .linklist a{display:block; padding:var(--u2) 0; font-size:12.5px; color:var(--text); text-decoration:none}
+  .linklist a:hover{color:var(--sky)}
+  .linklist a::after{content:" ↗"; color:var(--faint); font-size:10px}
+  .linklist a:hover::after{color:var(--sky)}
+
+  @media(max-width:820px){
+    .maplayout{grid-template-columns:1fr}
+    .twocol{grid-template-columns:1fr}
+    nav.tabs button{padding:0 var(--u3)}
+  }
+</style>
+
+<div id="splash">
+  <div class="logo">
+    <svg viewBox="0 0 700 460" aria-label="Learn To Fly">
+      <g id="plane">
+        <g transform="translate(157.24,140.43) scale(0.30042)">
+          <path d="M49,110 L135,110 L181,172 L69,172 Z" fill="#24abe1"/>
+          <path d="M205,39 L297,39 L427,174 L292,174 Z" fill="#18428f"/>
+          <path d="M71,173 L186,173 L265,281 L135,281 Z" fill="#0181c7"/>
+          <path d="M188,173 L291,173 L372,281 L267,281 Z" fill="#24abe1"/>
+          <path d="M294,173 L430,173 L527,280 L373,280 Z" fill="#1e2476"/>
+          <path d="M433,174 L636,174 L694,280 L530,280 Z" fill="#24abe1"/>
+        </g>
+      </g>
+      <line id="trace" x1="180.46" y1="226.85" x2="560" y2="226.85" stroke="#24a8d8" stroke-width="2" stroke-linecap="round" stroke-dasharray="379.54" stroke-dashoffset="379.54"/>
+      <g id="word">
+        <g transform="translate(164,223) scale(0.41)">
+        <text x="652" y="284" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="200" fill="#24abe1">os</text>
+        <g transform="translate(0,307) scale(0.1,-0.1)" fill="#18428f" stroke="none">
+          <path d="M5074 2780 c-51 -7 -124 -32 -174 -57 -14 -7 -31 -13 -37 -13 -7 0
+-13 -4 -13 -10 0 -5 -5 -10 -12 -10 -6 0 -34 -19 -62 -42 -86 -73 -133 -133
+-179 -230 -29 -62 -49 -152 -103 -463 -7 -44 -20 -116 -28 -160 -16 -90 -41
+-231 -61 -350 -30 -172 -70 -401 -101 -570 -8 -44 -21 -120 -29 -170 -9 -49
+-22 -124 -29 -165 -8 -41 -22 -113 -31 -160 -8 -47 -18 -104 -22 -127 l-6 -43
+305 0 305 0 12 55 c7 31 19 95 27 143 7 48 21 125 30 172 8 47 22 122 30 168
+8 45 20 119 28 165 8 45 22 123 31 172 10 50 20 110 24 135 l6 45 485 5 485 5
+10 75 c6 41 13 80 16 85 4 6 9 38 13 72 4 34 13 93 21 130 8 38 15 74 15 81 0
+9 -103 12 -480 12 -264 0 -480 1 -480 3 0 1 7 40 15 87 8 47 20 114 25 150 24
+159 43 223 80 261 20 21 52 41 75 48 27 7 200 11 517 11 269 0 479 4 482 9 3
+5 13 40 21 77 9 38 23 96 31 129 9 33 21 83 27 110 7 28 15 55 19 60 3 6 8 23
+9 39 4 29 3 30 -61 42 -140 26 -1100 44 -1236 24z"/>
+          <path d="M552 2697 c-6 -45 -16 -109 -22 -142 -18 -105 -39 -223 -55 -308 -15
+-83 -24 -132 -50 -287 -8 -47 -22 -123 -31 -170 -8 -47 -22 -121 -29 -165 -8
+-44 -20 -116 -28 -160 -8 -44 -22 -127 -31 -185 -9 -58 -19 -111 -21 -119 -3
+-7 -12 -57 -21 -110 -9 -53 -22 -132 -30 -176 -37 -207 -38 -306 -3 -403 46
+-127 119 -193 274 -247 39 -14 96 -18 265 -22 302 -6 1028 22 1047 40 2 3 11
+65 19 138 9 74 20 163 24 199 5 36 9 82 9 103 l1 37 -482 0 c-364 0 -489 3
+-507 13 -32 16 -54 81 -42 121 6 17 13 58 16 91 4 33 10 69 15 80 4 11 13 54
+19 95 6 41 18 111 26 155 8 44 22 123 30 177 8 53 19 116 24 140 9 40 26 135
+52 288 6 36 17 101 26 145 8 44 21 116 28 160 8 44 20 116 28 160 8 44 22 121
+30 172 9 51 20 116 25 145 6 29 13 68 16 86 l6 33 -309 -1 -308 -1 -11 -82z"/>
+          <path d="M2237 2753 c-3 -16 -9 -57 -13 -93 -3 -36 -10 -69 -14 -75 -4 -5 -11
+-41 -15 -80 -4 -38 -10 -78 -15 -90 -4 -11 -10 -46 -14 -77 l-7 -58 365 0
+c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
+-100 -26 -150 -9 -49 -23 -126 -30 -170 -7 -44 -23 -134 -35 -200 -12 -66 -24
+-133 -26 -150 -5 -32 -26 -149 -45 -250 -6 -33 -17 -98 -25 -145 -7 -47 -21
+-123 -30 -170 -26 -137 -43 -240 -55 -320 -6 -41 -13 -82 -16 -90 -7 -17 -9
+-28 -17 -82 l-6 -38 308 0 309 0 17 103 c10 56 22 125 28 152 10 50 27 147 53
+300 7 44 21 121 30 170 9 50 23 126 30 170 7 44 14 80 15 80 1 0 8 36 15 80
+17 104 50 296 70 410 10 50 23 126 31 170 7 44 21 121 29 170 9 50 22 124 29
+165 6 41 15 81 20 88 5 9 93 12 371 12 360 0 364 0 376 21 10 19 19 65 53 279
+7 41 15 82 18 90 4 8 9 36 12 63 l6 47 -1059 0 -1058 0 -6 -27z"/>
+        </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 759 303">
+        <path d="M49,110 L135,110 L181,172 L69,172 Z" fill="#24abe1"/>
+        <path d="M205,39 L297,39 L427,174 L292,174 Z" fill="#18428f"/>
+        <path d="M71,173 L186,173 L265,281 L135,281 Z" fill="#0181c7"/>
+        <path d="M188,173 L291,173 L372,281 L267,281 Z" fill="#24abe1"/>
+        <path d="M294,173 L430,173 L527,280 L373,280 Z" fill="#1e2476"/>
+        <path d="M433,174 L636,174 L694,280 L530,280 Z" fill="#24abe1"/>
+      </svg>
+      LTF<span class="os">OS</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-v="home" class="active">Home</button>
+      <button data-v="signout">Solo Signout</button>
+    </nav>
+    <div class="userchip"><span class="dot"></span> Instructor · prototype</div>
+  </header>
+
+  <main>
+    <section class="view show" data-view="home">
+      <h1 class="title">Operations System</h1>
+      <p class="sub">Consolidated instructor &amp; operations console</p>
+      <div class="banner"><b>Reference / training aid.</b> Weight &amp; balance, route and nav figures are for
+        cross-checking a student's own plan. The instructor verifies every solo independently against
+        current ERSA/charts and LTF procedures before authorising.</div>
+      <div class="plabel" style="margin-top:var(--u2)">Build Roadmap</div>
+      <div class="roadmap" id="roadmap"></div>
+      <div class="plabel" style="margin-top:var(--u4)">Quick Links</div>
+      <div class="linkgrid" id="linkgrid"></div>
+    </section>
+
+    <section class="view" data-view="signout">
+      <h1 class="title">Solo Signout</h1>
+      <p class="sub">Weight &amp; Balance, Fuel Plan, and Nav Map — everything needed to sign a student out for solo</p>
+      <nav class="subtabs" id="subtabs">
+        <button data-sv="wb" class="active">Weight &amp; Balance</button>
+        <button data-sv="fuel">Fuel Plan</button>
+        <button data-sv="navmap">Nav Map</button>
+      </nav>
+
+      <div class="subview" id="sub-wb" data-sub="wb">
+        <div class="subhead">Weight &amp; Balance</div>
+        <div class="twocol">
+          <div class="panel">
+            <div class="plabel">Loading</div>
+            <label class="f"><span>Aircraft</span><select id="ac"></select><div class="hint" id="acHint"></div></label>
+            <label class="f"><span>Front seats (kg)</span><input id="front" type="number" value="154"></label>
+            <label class="f"><span>Rear seats (kg)</span><input id="rear" type="number" value="0"></label>
+            <label class="f"><span>Baggage (kg)</span><input id="bag" type="number" value="0"><div class="hint" id="bagHint"></div></label>
+            <label class="f"><span>Fuel (litres)</span><input id="fuel" type="number" value="120"><div class="hint" id="fuelHint"></div></label>
+          </div>
+          <div>
+            <div class="panel" style="margin-bottom:16px">
+              <div class="plabel">Loading Sheet</div>
+              <table id="wbTable"></table>
+              <div class="checks" id="wbChecks"></div>
+            </div>
+            <div class="panel" id="envPanel">
+              <div class="plabel">CG Envelope</div>
+              <svg id="env" viewBox="0 0 420 300" style="width:100%"></svg>
+            </div>
+          </div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+
+      <div class="subview" id="sub-fuel" data-sub="fuel">
+        <div class="subhead">Fuel Plan</div>
+        <p class="sub" style="margin-top:0">Fuel Calculation Plan · SLG, DA40/2, PA44 flight planning sheet format</p>
+        <div class="twocol">
+          <div class="panel">
+            <div class="plabel">Aircraft</div>
+            <label class="f"><span>Aircraft</span><select id="fpAc"></select><div class="hint" id="fpAcHint"></div></label>
+            <div class="hint" style="margin-top:var(--u1)">Usable fuel is specific to the selected tail — checked against that aircraft's own figure, not a fleet-wide number.</div>
+          </div>
+          <div>
+            <div class="panel">
+              <div class="plabel">Fuel Calculation Plan</div>
+              <table id="fpTable"></table>
+            </div>
+            <div class="fpstats" id="fpStats"></div>
+          </div>
+        </div>
+        <div class="verdict" id="fpVerdict"></div>
+      </div>
+
+      <div class="subview" id="sub-navmap" data-sub="navmap">
+        <div class="subhead">Nav Map</div>
+        <p class="sub" style="margin-top:0">LTF standard solo routes · reference overlay</p>
+        <div class="maplayout">
+          <div class="navmenu">
+            <input class="search" id="navSearch" placeholder="Filter routes…">
+            <div id="navList"></div>
+          </div>
+          <div class="maparea">
+            <div class="maptop"><div class="rname" id="rName">—</div><div class="rmeta" id="rMeta"></div></div>
+            <svg id="map" viewBox="0 0 640 520"></svg>
+            <div class="maplegend">
+              <span class="swatch" style="background:#f47b20"></span>Dep/Arr<br>
+              <span class="swatch" style="background:#4a9fff"></span>Waypoint<br>
+              <span class="swatch" style="background:#f5a623"></span>Approx*
+            </div>
+            <div class="leglist"><table id="legTable"></table></div>
+          </div>
+        </div>
+        <div class="banner" style="margin-top:var(--u5)">Great-circle tracks &amp; distances, {MAGVAR}°E variation applied for °M.
+          Approximate town positions marked *. For cross-checking only — verify against current charts.</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const MAGVAR=11.5;
+const WP={"YMMB":{"n":"Moorabbin","lat":-37.9778,"lon":145.0998},"YAPO":{"n":"Apollo Bay","lat":-38.7749,"lon":143.6612},"YARA":{"n":"Ararat","lat":-37.31,"lon":142.9887},"YBDG":{"n":"Bendigo","lat":-36.7394,"lon":144.33},"YBLA":{"n":"Benalla","lat":-36.5519,"lon":146.007},"YBNS":{"n":"Bairnsdale","lat":-37.8875,"lon":147.5694},"YBSS":{"n":"Bacchus Marsh","lat":-37.7333,"lon":144.4217},"YCDE":{"n":"Cobden","lat":-38.3234,"lon":143.0566},"YCEM":{"n":"Coldstream","lat":-37.7277,"lon":145.4084},"YCOR":{"n":"Corowa","lat":-35.9947,"lon":146.357},"YDLQ":{"n":"Deniliquin","lat":-35.5594,"lon":144.946},"YDOD":{"n":"Donald","lat":-36.3603,"lon":143.008},"YDRN":{"n":"Drouin","lat":-38.209,"lon":145.8311},"YECH":{"n":"Echuca","lat":-36.1572,"lon":144.762},"YHML":{"n":"Hamilton","lat":-37.6489,"lon":142.065},"YHSM":{"n":"Horsham","lat":-36.6697,"lon":142.173},"YIVE":{"n":"Inverloch","lat":-38.6127,"lon":145.7335},"YKER":{"n":"Kerang","lat":-35.7514,"lon":143.939},"YKTN":{"n":"Kyneton","lat":-37.2263,"lon":144.4473},"YLED":{"n":"Lethbridge","lat":-37.9212,"lon":144.1031},"YLEG":{"n":"Leongatha","lat":-38.4965,"lon":145.8606},"YLTV":{"n":"Latrobe Valley","lat":-38.211,"lon":146.4708},"YMAV":{"n":"Avalon","lat":-38.0403,"lon":144.4672},"YMBU":{"n":"Maryborough","lat":-37.0331,"lon":143.709},"YMEN":{"n":"Essendon","lat":-37.7281,"lon":144.902},"YMFD":{"n":"Mansfield","lat":-37.0739,"lon":146.1207},"YMNG":{"n":"Mangalore","lat":-36.8883,"lon":145.184},"YOLA":{"n":"Colac","lat":-38.2867,"lon":143.68},"YORB":{"n":"Orbost","lat":-37.79,"lon":148.61},"YPBH":{"n":"Peterborough","lat":-38.6072,"lon":142.9038},"YSHT":{"n":"Shepparton","lat":-36.4283,"lon":145.3915},"YTQY":{"n":"Torquay AD","lat":-38.3,"lon":144.365},"YTYA":{"n":"Tyabb","lat":-38.2668,"lon":145.1794},"YWBL":{"n":"Warrnambool","lat":-38.2953,"lon":142.447},"YWGT":{"n":"Wangaratta","lat":-36.4179,"lon":146.3069},"YWHG":{"n":"Wahring","lat":-36.6811,"lon":145.2424},"YWSL":{"n":"West Sale","lat":-38.0908,"lon":146.9653},"YYRM":{"n":"Yarram","lat":-38.5667,"lon":146.7529},"YYWG":{"n":"Yarrawonga","lat":-36.0315,"lon":146.028},"ACE":{"n":"Ace","lat":-37.8958,"lon":145.1806},"APL":{"n":"Airport Lk","lat":-37.8556,"lon":144.975},"BMP":{"n":"Bulla","lat":-37.675,"lon":144.4389},"CARE":{"n":"Cardinia","lat":-37.9583,"lon":145.4167},"COWR":{"n":"Cowwarr","lat":-38.0144,"lon":146.6931},"HEAT":{"n":"Heathcote","lat":-36.9167,"lon":144.7},"KIM":{"n":"Kimbolton","lat":-37.3,"lon":144.9542},"LSR":{"n":"Lake Reeve","lat":-38.05,"lon":147.5833},"MGBH":{"n":"McLoughlins","lat":-38.4489,"lon":147.0992},"MHT":{"n":"Mt Martha","lat":-38.3167,"lon":144.9833},"PIPS":{"n":"Pt Impossible","lat":-38.2933,"lon":144.6333},"SGSV":{"n":"Sugarloaf","lat":-37.675,"lon":145.3},"TON":{"n":"Toolern","lat":-37.8553,"lon":144.7553},"VTG":{"n":"You Yangs","lat":-37.8833,"lon":144.4167},"WMS":{"n":"Williams","lat":-37.8694,"lon":144.9111},"YYM":{"n":"Yan Yean","lat":-38.2472,"lon":145.2508},"Torquay":{"n":"Torquay","lat":-38.33,"lon":144.32,"ap":1},"Terang":{"n":"Terang","lat":-38.24,"lon":142.92,"ap":1},"Mortlake":{"n":"Mortlake","lat":-38.08,"lon":142.79,"ap":1},"Noojee":{"n":"Noojee","lat":-37.91,"lon":145.96,"ap":1},"Dookie":{"n":"Dookie","lat":-36.35,"lon":145.7,"ap":1},"Mathoura":{"n":"Mathoura","lat":-35.81,"lon":144.9,"ap":1},"Yambuna":{"n":"Yambuna","lat":-36.1,"lon":144.92,"ap":1},"Weerite":{"n":"Weerite","lat":-38.25,"lon":143.26,"ap":1},"Cape Liptrap":{"n":"Cape Liptrap","lat":-38.91,"lon":145.95,"ap":1}};
+const ROUTES=[
+  {id:"ppl1",label:"PPL First Solo Nav",ac:"C172",legs:["YMMB","YLTV","YLEG","YMMB"]},
+  {id:"s1",label:"Nav Solo 1",ac:"DA40",legs:["YMMB","YLTV","YYRM","YLEG","YMMB"]},
+  {id:"s2",label:"Nav Solo 2",ac:"DA40",legs:["YMMB","YTYA","YIVE","YYRM","YLTV","YDRN","YCEM","YMMB"]},
+  {id:"s3",label:"Nav Solo 3",ac:"DA40",legs:["YMMB","YLEG","YLTV","YMMB"]},
+  {id:"s4",label:"Nav Solo 4",ac:"DA40",legs:["YMMB","YTYA","PIPS","Torquay","YOLA","YWBL","YLED","VTG","YMMB"]},
+  {id:"s5",label:"Nav Solo 5",ac:"DA40",legs:["YMMB","APL","TON","BMP","YARA","YMBU","KIM","SGSV","ACE","YMMB"]},
+  {id:"s6",label:"Nav Solo 6",ac:"DA40",legs:["YMMB","MHT","PIPS","YAPO","Terang","YLED","YMAV","TON","YMMB"]},
+  {id:"s7",label:"Nav Solo 7",ac:"DA40",legs:["YMMB","MHT","PIPS","Torquay","Weerite","YHML","YARA","BMP","TON","YMMB"]},
+  {id:"s8",label:"Nav Solo 8",ac:"DA40",legs:["YMMB","YIVE","YLTV","PIPS","YMAV","TON","WMS","YMMB"]},
+  {id:"s9",label:"Nav Solo 9",ac:"DA40",legs:["YMMB","APL","TON","YBSS","YMAV","PIPS","MHT","YLTV","YLEG","YTYA","YMMB"]},
+  {id:"s10",label:"Nav Solo 10",ac:"DA40",legs:["YMMB","SGSV","YMFD","YWGT","Yambuna","YSHT","KIM","SGSV","YMMB"]},
+  {id:"s11",label:"Nav Solo 11",ac:"DA40",legs:["YMMB","APL","TON","BMP","YDOD","YBDG","KIM","SGSV","YMMB"]},
+  {id:"s12",label:"Nav Solo 12",ac:"DA40",legs:["YMMB","SGSV","KIM","YSHT","YCOR","YBLA","YMFD","YCEM","YMMB"]},
+  {id:"s13",label:"Nav Solo 13",ac:"DA40",legs:["YMMB","SGSV","KIM","YSHT","Dookie","YWHG","KIM","SGSV","YMMB"]},
+  {id:"s14",label:"Nav Solo 14",ac:"DA40",legs:["YMMB","YLTV","COWR","YBNS","LSR","YYRM","Cape Liptrap","YLEG","YMMB"]},
+  {id:"s15",label:"Nav Solo 15",ac:"DA40",legs:["YMMB","SGSV","KIM","YBDG","YKER","YKTN","KIM","YMMB"]},
+  {id:"s16",label:"Nav Solo 16",ac:"DA40",legs:["YMMB","YCEM","YYWG","Mathoura","YSHT","KIM","SGSV","YMMB"]},
+];
+const FLEET=[
+  // maxFuelL = usable fuel per aircraft, litres.
+  // CORRECTED this session (user confirmed): VH-MNN is the only standard-tank
+  // aircraft (152L usable); the rest of the fleet has long-range tanks (188L
+  // usable). Previously this file had a flat 148L for all 7 — wrong, and
+  // exactly the per-tail variation the maxFuelL field was designed to hold.
+  {reg:"VH-MNN",bew:793.2,arm:2.4695,maxFuelL:152},{reg:"VH-FPP",bew:823.4,arm:2.4803,maxFuelL:188},
+  {reg:"VH-YHH",bew:811.5,arm:2.4909,maxFuelL:188},{reg:"VH-JHH",bew:790.1,arm:2.4585,maxFuelL:188},
+  {reg:"VH-XPP",bew:821.0,arm:2.4810,maxFuelL:188},
+  {reg:"VH-NOO",bew:796.5,arm:2.4740,maxFuelL:188},{reg:"VH-MII",bew:794.5,arm:2.4683,maxFuelL:188},
+];
+const ARMS={front:2.30,rear:3.25,bag:3.65,fuel:2.63};
+const LIM={mtow:1200,bag:30};
+const ENV=[{w:780,a:2.40},{w:980,a:2.40},{w:1150,a:2.462},{w:1200,a:2.48},{w:1200,a:2.59},{w:780,a:2.59}];
+const FUEL_KG_PER_L=135.36/148;
+
+function nm(a,b){const R=3440.065,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function trk(a,b){const dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;const y=Math.sin(dLon)*Math.cos(la2),x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);return ((Math.atan2(y,x)*180/Math.PI)+360)%360;}
+function inEnv(w,a){let ins=false;for(let i=0,j=ENV.length-1;i<ENV.length;j=i++){const xi=ENV[i].a,yi=ENV[i].w,xj=ENV[j].a,yj=ENV[j].w;const hit=((yi>w)!==(yj>w))&&(a<((xj-xi)*(w-yi))/(yj-yi)+xi);if(hit)ins=!ins;}return ins;}
+const $=s=>document.querySelector(s);
+const pad3=n=>String(Math.round(n)).padStart(3,"0");
+
+window.addEventListener("load",()=>{
+  setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on");}, 2500);
+});
+
+const VERSION="v0.11.0";
+$("#tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  goView(b.dataset.v);
+});
+function goView(v){
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active",x.dataset.v===v));
+  document.querySelectorAll(".view").forEach(x=>x.classList.toggle("show",x.dataset.view===v));
+  window.scrollTo(0,0);
+}
+
+$("#subtabs").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  goSub(b.dataset.sv);
+});
+function goSub(v){
+  document.querySelectorAll("#subtabs button").forEach(x=>x.classList.toggle("active",x.dataset.sv===v));
+  document.getElementById("sub-"+v).scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+// Scroll-spy: illuminate the sub-tab matching whichever section is currently
+// under the sticky header, as the user scrolls through the one-page Solo
+// Signout view (not just on click). rootMargin pulls the detection line down
+// past the sticky header+subtabs (~120px) and trims the bottom so only the
+// section nearest the top of the viewport counts as "current".
+const subSpy=new IntersectionObserver(entries=>{
+  entries.forEach(en=>{
+    if(en.isIntersecting){
+      const v=en.target.dataset.sub;
+      document.querySelectorAll("#subtabs button").forEach(x=>x.classList.toggle("active",x.dataset.sv===v));
+    }
+  });
+},{rootMargin:"-120px 0px -70% 0px", threshold:0});
+document.querySelectorAll(".subview").forEach(el=>subSpy.observe(el));
+
+// Build roadmap order: Module 1 is Solo Signout (the one actually built), 2–6 continue the planned build.
+const MODS=[
+  {t:"Solo Signout Checker",d:"W&B, CG envelope, and fuel plan checks — all live. Nav verification next.",s:"live",v:"signout"},
+  {t:"Circuit Booking",d:"YMMB circuit bookings, 2-week window, FlightLogger link.",s:"planned"},
+  {t:"Flight Data Dashboard",d:"Consolidated FlightLogger data & utilisation.",s:"planned"},
+  {t:"Student Master View",d:"Progress, exam results, KDR tracking.",s:"planned"},
+  {t:"Maintenance Tracker",d:"Aircraft schedules, defects, service due.",s:"planned"},
+  {t:"Command Centre",d:"Real-time whole-of-business overview.",s:"planned"},
+];
+$("#roadmap").innerHTML=MODS.map((m,i)=>`<div class="rmnode ${m.s==='live'?'live':''}" ${m.v?`onclick="goView('${m.v}')"`:""}>
+  <div class="rmline"></div>
+  <div class="rmdot">${i+1}</div>
+  <div class="rmcard">
+    <div class="rmtitle">${m.t}</div>
+    <div class="rmdesc">${m.d}</div>
+    <div class="rmstatus" style="color:${m.s==='live'?'var(--green)':'var(--faint)'}">${m.s==='live'?'live':'planned'}</div>
+  </div>
+</div>`).join("");
+$("#foot").textContent=`LTF OS ${VERSION} (pre-release) · Reference aid, not an operational authority`;
+
+// Quick Links — mirrors https://linktr.ee/learntofly_instructors, fetched 9 Jul 2026.
+// Same categories and order as the source. Most destinations require an LTF
+// login (Google Forms/Sheets) — that's expected, this is a directory, not a
+// re-implementation of those forms. Re-fetch and update if the Linktree changes.
+const QUICK_LINKS=[
+  { cat:"LTF Flying OPS Structure", links:[
+    { t:"Instructor Roles & Responsibilities", href:"https://learntofly.edu.au/wp-content/uploads/2025/10/Instructor-Roles-LTF-Flying-OPS-Structure.pdf" },
+    { t:"Company Procedures & Operation Guidance", href:"https://learntofly.edu.au/wp-content/uploads/2026/01/LTF-Company-Procedures-Operation-Guidance-V2.3.pdf" },
+    { t:"LTF Flying OPS Structure", href:"https://learntofly.edu.au/wp-content/uploads/2025/06/Flying-Ops-Structure-SEP-25.pdf" },
+    { t:"LTF Flying OPS Management Flowchart", href:"https://learntofly.edu.au/wp-content/uploads/2025/09/Flying-Ops-Management-Flowchart-.pdf" },
+    { t:"Responsibilities and Audit, Meeting & Training Schedule", href:"https://docs.google.com/spreadsheets/d/1TG_aqLGVlLC6SuzNQ9C8z0Cg0R10wr3tl7eRvc3iiGk/edit?gid=1026632485#gid=1026632485" },
+  ]},
+  { cat:"Forms To Be Submitted", links:[
+    { t:"Instructor Weekly Submission Forms", href:"https://linktr.ee/InstructorWeeklySubmissionForm" },
+    { t:"Action Checklist For Flight Cancellation Or Early Leave", href:"https://learntofly.edu.au/wp-content/uploads/2026/01/Action-Checklist-For-Flight-Cancellation-Or-Early-Leave-Full-Time-Staff.pdf" },
+  ]},
+  { cat:"Training Related", links:[
+    { t:"Private Students Master Sheet", href:"https://docs.google.com/spreadsheets/d/1P2t8c7PAGgpjqqfc_rN8XD-OIxDmmE6PiIVLuFHmKSY/edit?gid=625602687#gid=625602687" },
+    { t:"Flight Test Notification Form", href:"https://docs.google.com/forms/d/e/1FAIpQLScSVlrYVVp9LCidZgQh_FiPQfbGr9_mUiMWpTJIsJp5m9Bq3A/viewform" },
+    { t:"Submit RPL Training Alert", href:"https://docs.google.com/forms/d/e/1FAIpQLSezRyXDYFw2mvGVk62DicfrP8PDc1qy_lsHpEE39h7XLgqPfw/viewform" },
+    { t:"Submit PPL / CPL Training Alert", href:"https://docs.google.com/forms/d/e/1FAIpQLSfhBvGN7w003JFy-c90Wr0BKbgJpicTsBafPQpzI0VohF5qRg/viewform" },
+    { t:"Submit FIR Training Alert", href:"https://docs.google.com/forms/d/e/1FAIpQLSfcLqZ9FfgTpkrg7m3tjP9CqUD6RCldVqJbJr4Ufw32ysydJQ/viewform" },
+    { t:"Submit Student's Theory Exam Result", href:"https://docs.google.com/forms/d/e/1FAIpQLSeurjd6YTnXoKuE0Oi82oy6yY5nYAXm4YeKvSCgr-T07rzrgg/viewform" },
+  ]},
+  { cat:"For Diploma Instructors", links:[
+    { t:"LTF CPL Diploma Priority Dashboard", href:"https://docs.google.com/spreadsheets/d/1TqJzQ__r14G_E1pPS3P_V2lAmn0p_V9ZD1bGfSbBwyE/edit?gid=429602808#gid=429602808" },
+    { t:"Professional Development Reporting Form", href:"https://forms.gle/2A628QQSGJ2JQrS26" },
+  ]},
+  { cat:"Maintenance", links:[
+    { t:"Report Maintenance Issues", href:"https://docs.google.com/forms/d/e/1FAIpQLSdwxDzkw39BrJz3Gun907OspvxhmTP6vBHZVypPRTCMDY4Ngg/viewform" },
+  ]},
+  { cat:"Leave Application", links:[
+    { t:"Leave Application", href:"https://docs.google.com/forms/d/e/1FAIpQLSfxxgnCSblgPZkCP5RuP4VZjwHgHMQlZKBsHXD3QJhyXBrHMg/viewform" },
+    { t:"Time-in-Lieu Application", href:"https://docs.google.com/forms/d/e/1FAIpQLSdCEpXK7yCdD-g6q-uHxuRasWYF022n1MGjSJc1k70vzkAzEw/viewform?usp=publish-editor" },
+  ]},
+];
+$("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
+  <div class="linkcat-title">${c.cat}</div>
+  <ul class="linklist">${c.links.map(l=>`<li><a href="${l.href}" target="_blank" rel="noopener">${l.t}</a></li>`).join("")}</ul>
+</div>`).join("");
+
+
+const acSel=$("#ac");
+acSel.innerHTML=FLEET.map(f=>`<option>${f.reg}</option>`).join("");
+["#ac","#front","#rear","#bag","#fuel"].forEach(s=>$(s).addEventListener("input",calcWB));
+const ICON_CHECK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const ICON_CROSS='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+const chk=(ok,l)=>`<div class="chk"><span class="i" style="color:${ok?'var(--green)':'var(--red)'}">${ok?ICON_CHECK:ICON_CROSS}</span><span style="color:${ok?'var(--text)':'var(--red)'}">${l}</span></div>`;
+function calcWB(){
+  const ac=FLEET.find(f=>f.reg===acSel.value);
+  $("#acHint").textContent=`BEW ${ac.bew} kg · arm ${ac.arm} m`;
+  const f=+$("#front").value||0,r=+$("#rear").value||0,b=+$("#bag").value||0;
+  const acMaxFuelKg=ac.maxFuelL*FUEL_KG_PER_L;
+  const fuelKg=Math.min((+$("#fuel").value||0)*FUEL_KG_PER_L,acMaxFuelKg);
+  $("#fuelHint").textContent=`${fuelKg.toFixed(1)} kg · max ${ac.maxFuelL} L usable on ${ac.reg}`;
+  $("#bagHint").textContent=b>LIM.bag?`Over max ${LIM.bag} kg`:"";
+  $("#bagHint").style.color=b>LIM.bag?"var(--red)":"var(--dim)";
+  const rows=[["Basic Empty Weight",ac.bew,ac.arm],["Front Seats",f,ARMS.front],["Rear Seats",r,ARMS.rear],["Baggage",b,ARMS.bag]];
+  let zfw=0,zfwM=0; rows.forEach(x=>{x.push(x[1]*x[2]);zfw+=x[1];zfwM+=x[3];});
+  const fuelM=fuelKg*ARMS.fuel,tow=zfw+fuelKg,towM=zfwM+fuelM,cg=towM/tow;
+  const ch={mtow:tow<=LIM.mtow,bag:b<=LIM.bag,fuel:fuelKg<=acMaxFuelKg+.01,env:inEnv(tow,cg)};
+  const pass=Object.values(ch).every(Boolean);
+  $("#wbTable").innerHTML=`<thead><tr><th>Item</th><th class="num">Wt</th><th class="num">Arm</th><th class="num">Moment</th></tr></thead><tbody>
+    ${rows.map(x=>`<tr><td>${x[0]}</td><td class="num">${x[1].toFixed(1)}</td><td class="num">${x[2].toFixed(3)}</td><td class="num">${x[3].toFixed(1)}</td></tr>`).join("")}
+    <tr class="sub"><td class="bold">Zero Fuel Weight</td><td class="num bold">${zfw.toFixed(1)}</td><td class="num">—</td><td class="num bold">${zfwM.toFixed(1)}</td></tr>
+    <tr><td>Fuel</td><td class="num">${fuelKg.toFixed(1)}</td><td class="num">${ARMS.fuel.toFixed(2)}</td><td class="num">${fuelM.toFixed(1)}</td></tr>
+    <tr class="tot"><td class="bold">Take-off Weight</td><td class="num bold">${tow.toFixed(1)}</td><td class="num bold">${cg.toFixed(3)}</td><td class="num bold">${towM.toFixed(1)}</td></tr></tbody>`;
+  $("#wbChecks").innerHTML=chk(ch.mtow,`TOW ≤ ${LIM.mtow} kg`)+chk(ch.bag,`Baggage ≤ ${LIM.bag} kg`)+chk(ch.fuel,`Fuel ≤ ${ac.maxFuelL} L usable (${ac.reg})`)+chk(ch.env,"CG within envelope");
+  drawEnv({
+    empty:{w:ac.bew, a:ac.arm, label:"Empty"},
+    zfw:{w:zfw, a:zfw?zfwM/zfw:ac.arm, label:"ZFW"},
+    tow:{w:tow, a:cg, label:"TOW"},
+  },pass);
+  const col=pass?"var(--green)":"var(--red)";
+  $("#verdict").style.borderColor=pass?"rgba(34,197,94,.35)":"rgba(242,85,76,.4)";
+  $("#verdict").style.background=pass?"rgba(34,197,94,.08)":"rgba(242,85,76,.08)";
+  $("#verdict").innerHTML=`<div class="vdot" style="background:${col}"></div>
+    <div><div class="vlabel" style="color:${col}">${pass?"WITHIN LIMITS":"OUT OF LIMITS"}</div>
+    <div class="vsub">${pass?"Within DA40 limits. Instructor confirms independently before authorising solo.":"Fails one or more checks — do not authorise until corrected."}</div></div>
+    <button class="vbtn" ${pass?"":'style="opacity:.4;cursor:not-allowed" disabled'}>Instructor confirm →</button>`;
+}
+function declutter(vals,minGap){
+  // Push a sorted set of 1D positions apart so no two are closer than minGap, preserving order.
+  const idx=vals.map((v,i)=>i).sort((a,b)=>vals[a]-vals[b]);
+  const out=vals.slice();
+  for(let k=1;k<idx.length;k++){
+    const prev=idx[k-1], cur=idx[k];
+    if(out[cur]-out[prev]<minGap) out[cur]=out[prev]+minGap;
+  }
+  return out;
+}
+function drawEnv(pts,pass){
+  const P={x0:2.36,x1:2.63,y0:760,y1:1220,w:300,h:250,ox:60,oy:10};
+  const px=a=>P.ox+((a-P.x0)/(P.x1-P.x0))*P.w,py=w=>P.oy+P.h-((w-P.y0)/(P.y1-P.y0))*P.h;
+  const NUMFONT="'Geist Mono','JetBrains Mono',ui-monospace,monospace";
+  const order=["empty","zfw","tow"];
+  const towCol=pass?"#22c55e":"#f2554c";
+  const COLORS={empty:"#8b96ac",zfw:"#24a8d8",tow:towCol};
+
+  // background wash — flips to a red alert tint when out of bounds
+  const bgFill=pass?"none":"rgba(242,85,76,.07)";
+  $("#envPanel").classList.toggle("envfail",!pass);
+
+  let g=`<rect x="0" y="0" width="420" height="300" fill="${bgFill}"/>`;
+  [800,900,1000,1100,1200].forEach(w=>{g+=`<line x1="${P.ox}" y1="${py(w)}" x2="${P.ox+P.w}" y2="${py(w)}" stroke="rgba(255,255,255,.06)"/>`;});
+  [2.40,2.45,2.50,2.55,2.60].forEach(a=>{g+=`<line x1="${px(a)}" y1="${P.oy}" x2="${px(a)}" y2="${P.oy+P.h}" stroke="rgba(255,255,255,.06)"/>`;});
+  const poly=ENV.map(p=>`${px(p.a).toFixed(1)},${py(p.w).toFixed(1)}`).join(" ");
+  const envFill=pass?"rgba(36,168,216,.10)":"rgba(242,85,76,.14)";
+  const envStroke=pass?"#24a8d8":"#f2554c";
+
+  const trail=order.map(k=>`${px(pts[k].a).toFixed(1)},${py(pts[k].w).toFixed(1)}`).join(" ");
+
+  // raw positions before decluttering
+  const rawWY=order.map(k=>py(pts[k].w));      // weight-axis label y positions
+  const rawAX=order.map(k=>px(pts[k].a));      // arm-axis label x positions
+  const rawLY=order.map(k=>py(pts[k].w)-11);   // point-label block anchor y (title line)
+  const wY=declutter(rawWY,13);
+  const aX=declutter(rawAX,36);
+  const lY=declutter(rawLY,24);
+
+  let guides="", markers="", labels="";
+  order.forEach((k,i)=>{
+    const p=pts[k], col=COLORS[k], x=px(p.a), y=py(p.w);
+    guides+=`<line x1="${P.ox}" y1="${y}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="1" stroke-dasharray="2,3" opacity=".7"/>`;
+    guides+=`<line x1="${x}" y1="${y}" x2="${x}" y2="${P.oy+P.h}" stroke="${col}" stroke-width="1" stroke-dasharray="2,3" opacity=".7"/>`;
+    guides+=`<text x="${P.ox-6}" y="${wY[i]+3}" fill="${col}" font-size="9" font-weight="700" font-family="${NUMFONT}" text-anchor="end">${p.w.toFixed(0)}</text>`;
+    guides+=`<text x="${aX[i]}" y="${P.oy+P.h+13}" fill="${col}" font-size="9" font-weight="700" font-family="${NUMFONT}" text-anchor="middle">${p.a.toFixed(3)}</text>`;
+    const r = k==="tow" ? 6 : 4.5;
+    markers+=`<circle cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="#0a1526" stroke-width="1.5"/>`;
+    if(k==="tow"){
+      markers+=`<circle cx="${x}" cy="${y}" r="12" fill="none" stroke="${col}" stroke-width="1.5" opacity=".35">`
+        +(!pass?'<animate attributeName="r" values="10;15;10" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;.15;.5" dur="1.6s" repeatCount="indefinite"/>':'')+`</circle>`;
+    }
+    const anchor = x > P.ox+P.w*0.62 ? "end" : (x < P.ox+P.w*0.2 ? "start" : "middle");
+    const dx = anchor==="end" ? -9 : (anchor==="start" ? 9 : 0);
+    labels+=`<text x="${x+dx}" y="${lY[i]}" fill="${col}" font-size="10.5" font-weight="700" text-anchor="${anchor}">${p.label}</text>
+      <text x="${x+dx}" y="${lY[i]+10}" fill="${col}" font-size="9" font-family="${NUMFONT}" text-anchor="${anchor}" opacity=".85">${p.w.toFixed(0)} kg · ${p.a.toFixed(3)} m</text>`;
+  });
+
+  $("#env").innerHTML=g+
+    `<polygon points="${poly}" fill="${envFill}" stroke="${envStroke}" stroke-width="2"/>
+     <polyline points="${trail}" fill="none" stroke="#8b96ac" stroke-width="1.25" stroke-dasharray="1,3" opacity=".8"/>
+     ${guides}${markers}${labels}
+     <text x="${P.ox+P.w/2}" y="${P.oy+P.h+30}" fill="#8b96ac" font-size="10" text-anchor="middle" letter-spacing="1">CG ARM (m)</text>`;
+}
+calcWB();
+
+// --- Solo Fuel Plan Checker ---
+// Rows match the Fuel Calculation Plan section of the LTF flight planning
+// sheet (SLG, DA40/2, PA44 — v1.1 Dec 2024): each phase logged in both
+// MIN and LITRES, exactly as the paper form has it — the tool doesn't
+// auto-convert time to litres because burn rate varies by phase (climb vs
+// cruise vs taxi) and should come from the POH, not a single assumed rate.
+const FUEL_ROWS=[
+  {k:"climb",l:"Climb"},
+  {k:"trip",l:"Trip Fuel"},
+  {k:"alt",l:"Dest. Alternate"},
+  {k:"cont",l:"Contingency Fuel",hint:"Exposition 2.2.1(7): only required for turbojet/large aeroplane — not LTF's piston singles/twins. Confirm with HOO if LTF still wants one entered regardless."},
+  {k:"reserve",l:"Final Reserve Fuel",hint:"Exposition 2.2.1(4a): 30 min day-VFR at holding rate (small aeroplane, <5700kg) — 45 min if IFR/night-VFR."},
+  {k:"hold",l:"Holding"},
+  {k:"disc",l:"Discretionary",hint:"Exposition 2.2.4: 45 min minimum for training area flights, 60 min minimum for cross-country nav flights."},
+  {k:"taxi",l:"Taxi"},
+];
+const fpAcSel=$("#fpAc");
+fpAcSel.innerHTML=FLEET.map(f=>`<option>${f.reg}</option>`).join("");
+$("#fpTable").innerHTML=`<thead><tr><th></th><th class="num">Min</th><th class="num">Litres</th></tr></thead>
+  <tbody>
+    ${FUEL_ROWS.slice(0,3).map(r=>`<tr><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num"><input type="number" id="fp-${r.k}-m" value="0" min="0"></td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"></td></tr>`).join("")}
+    <tr class="sub"><td class="bold">Sub-Total</td><td class="num bold" id="fpSubM"></td><td class="num bold" id="fpSubL"></td></tr>
+    ${FUEL_ROWS.slice(3).map(r=>`<tr><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num"><input type="number" id="fp-${r.k}-m" value="0" min="0"></td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"></td></tr>`).join("")}
+    <tr class="tot"><td class="bold">Fuel Required</td><td class="num bold" id="fpReqM"></td><td class="num bold" id="fpReqL"></td></tr>
+  </tbody>`;
+document.querySelectorAll('#fpTable input, #fpAc').forEach(el=>el.addEventListener("input",calcFuelPlan));
+
+function calcFuelPlan(){
+  const ac=FLEET.find(f=>f.reg===fpAcSel.value);
+  $("#fpAcHint").textContent=`Usable fuel: ${ac.maxFuelL} L (${ac.reg})`;
+  const v=k=>+$(`#fp-${k}-l`).value||0, vm=k=>+$(`#fp-${k}-m`).value||0;
+  const subM=vm("climb")+vm("trip")+vm("alt");
+  const subL=v("climb")+v("trip")+v("alt");
+  $("#fpSubM").textContent=subM.toFixed(0);
+  $("#fpSubL").textContent=subL.toFixed(1);
+  const reqM=subM+vm("cont")+vm("reserve")+vm("hold")+vm("disc")+vm("taxi");
+  const reqL=subL+v("cont")+v("reserve")+v("hold")+v("disc")+v("taxi");
+  $("#fpReqM").textContent=reqM.toFixed(0);
+  $("#fpReqL").textContent=reqL.toFixed(1);
+  const marginL=ac.maxFuelL-reqL;
+  const pass=marginL>=0;
+  const started=reqL>0||reqM>0;
+  $("#fpReqL").style.color=(pass||!started)?"":"var(--red)";
+  const burnLPerMin=reqM>0?reqL/reqM:null;
+  const enduranceM=burnLPerMin?ac.maxFuelL/burnLPerMin:null;
+  $("#fpStats").innerHTML=`
+    <div class="fpstat"><div class="lbl">Usable Fuel (${ac.reg})</div><div class="val">${ac.maxFuelL.toFixed(0)} L</div></div>
+    <div class="fpstat ${(!started||pass)?'':'bad'}"><div class="lbl">Fuel Required</div><div class="val">${reqL.toFixed(1)} L</div></div>
+    <div class="fpstat ${!started?'':(pass?'good':'bad')}"><div class="lbl">Fuel Margin</div><div class="val">${started?(marginL>=0?'+':'')+marginL.toFixed(1)+' L':'—'}</div></div>
+    <div class="fpstat"><div class="lbl">Endurance (est.)</div><div class="val">${enduranceM?enduranceM.toFixed(0)+' min':'—'}</div></div>`;
+  if(!started){
+    $("#fpVerdict").style.borderColor="var(--line)";
+    $("#fpVerdict").style.background="var(--panel2)";
+    $("#fpVerdict").innerHTML=`<div class="vdot" style="background:var(--faint)"></div>
+      <div><div class="vlabel" style="color:var(--dim)">NOT YET PLANNED</div>
+      <div class="vsub">Fill in the Fuel Calculation Plan above to check against ${ac.reg}'s ${ac.maxFuelL} L usable fuel.</div></div>
+      <button class="vbtn" style="opacity:.4;cursor:not-allowed" disabled>Instructor confirm →</button>`;
+    return;
+  }
+  const col=pass?"var(--green)":"var(--red)";
+  $("#fpVerdict").style.borderColor=pass?"rgba(34,197,94,.35)":"rgba(242,85,76,.4)";
+  $("#fpVerdict").style.background=pass?"rgba(34,197,94,.08)":"rgba(242,85,76,.08)";
+  $("#fpVerdict").innerHTML=`<div class="vdot" style="background:${col}"></div>
+    <div><div class="vlabel" style="color:${col}">${pass?"FUEL REQUIRED WITHIN USABLE FUEL":"EXCEEDS USABLE FUEL"}</div>
+    <div class="vsub">${pass?`Fuel required fits within ${ac.reg}'s ${ac.maxFuelL} L usable fuel. Instructor confirms independently before authorising solo.`:`Fuel required exceeds ${ac.reg}'s ${ac.maxFuelL} L usable fuel by ${Math.abs(marginL).toFixed(1)} L — reduce fuel requirement or select a different aircraft.`}</div></div>
+    <button class="vbtn" ${pass?"":'style="opacity:.4;cursor:not-allowed" disabled'}>Instructor confirm →</button>`;
+}
+calcFuelPlan();
+
+
+let curRoute=ROUTES[1];
+function routeDist(r){let d=0;for(let i=0;i<r.legs.length-1;i++)d+=nm(WP[r.legs[i]],WP[r.legs[i+1]]);return d;}
+function renderNavList(f=""){
+  const q=f.toLowerCase();
+  $("#navList").innerHTML=ROUTES.filter(r=>r.label.toLowerCase().includes(q)).map(r=>
+    `<div class="navitem ${r.id===curRoute.id?'active':''}" data-id="${r.id}"><span>${r.label}</span><small>${routeDist(r).toFixed(0)}nm</small></div>`).join("");
+  document.querySelectorAll(".navitem").forEach(el=>el.addEventListener("click",()=>{
+    curRoute=ROUTES.find(r=>r.id===el.dataset.id); renderNavList($("#navSearch").value); drawMap();
+  }));
+}
+$("#navSearch").addEventListener("input",e=>renderNavList(e.target.value));
+function drawMap(){
+  const pts=curRoute.legs.map(c=>({code:c,...WP[c]}));
+  const lats=pts.map(p=>p.lat),lons=pts.map(p=>p.lon),pad=.25;
+  const minLa=Math.min(...lats)-pad,maxLa=Math.max(...lats)+pad,minLo=Math.min(...lons)-pad,maxLo=Math.max(...lons)+pad;
+  const W=640,H=520,sx=lo=>((lo-minLo)/(maxLo-minLo))*W,sy=la=>H-((la-minLa)/(maxLa-minLa))*H;
+  let grid="";
+  for(let la=Math.ceil(minLa/.5)*.5;la<maxLa;la+=.5)grid+=`<line x1="0" y1="${sy(la)}" x2="${W}" y2="${sy(la)}" stroke="rgba(255,255,255,.06)"/>`;
+  for(let lo=Math.ceil(minLo/.5)*.5;lo<maxLo;lo+=.5)grid+=`<line x1="${sx(lo)}" y1="0" x2="${sx(lo)}" y2="${H}" stroke="rgba(255,255,255,.06)"/>`;
+  const path=pts.map((p,i)=>`${i?'L':'M'}${sx(p.lon).toFixed(1)},${sy(p.lat).toFixed(1)}`).join(" ");
+  const seen=new Set(); let dots="";
+  pts.forEach((p,i)=>{const first=i===0,col=first?"#f47b20":(p.ap?"#f5a623":"#4a9fff");
+    dots+=`<circle cx="${sx(p.lon)}" cy="${sy(p.lat)}" r="${first?7:5}" fill="${col}" stroke="#0a1526" stroke-width="2"/>`;
+    if(!seen.has(p.code)){seen.add(p.code);dots+=`<text x="${sx(p.lon)+9}" y="${sy(p.lat)+3}" fill="#9aa5bd" font-size="11" font-family="'Geist Mono','JetBrains Mono',monospace" font-weight="600">${p.code}${p.ap?'*':''}</text>`;}});
+  const tot=Math.round([...Array(pts.length-1)].reduce((s,_,i)=>s+nm(pts[i],pts[i+1]),0));
+  $("#map").innerHTML=`<rect width="${W}" height="${H}" fill="#0a1526"/>${grid}
+    <path d="${path}" fill="none" stroke="#f47b20" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="3000" stroke-dashoffset="3000">
+      <animate attributeName="stroke-dashoffset" from="3000" to="0" dur="1.4s" fill="freeze"/></path>${dots}`;
+  $("#rName").textContent=curRoute.label;
+  $("#rMeta").textContent=`${curRoute.legs.length-1} legs · ${tot} nm`;
+  let rows="";
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],d=nm(a,b),tt=trk(a,b),tm=(tt-MAGVAR+360)%360,ap=a.ap||b.ap;
+    rows+=`<tr${ap?' style="background:rgba(245,166,35,.10)"':''}><td style="font-family:'Geist Mono','JetBrains Mono',monospace">${a.code}→${b.code}</td><td class="num">${d.toFixed(1)}</td><td class="num">${pad3(tt)}</td><td class="num" style="color:var(--orange);font-weight:700">${pad3(tm)}</td></tr>`;}
+  $("#legTable").innerHTML=`<thead><tr><th>Leg</th><th class="num">nm</th><th class="num">TT</th><th class="num">°M</th></tr></thead><tbody>${rows}</tbody>`;
+}
+renderNavList();
+drawMap();
+document.querySelectorAll('.banner').forEach(b=>{b.innerHTML=b.innerHTML.replace('{MAGVAR}',MAGVAR);});
+</script>
