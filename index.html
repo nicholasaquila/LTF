@@ -225,7 +225,7 @@
   <div class="logo">
     <svg viewBox="0 0 700 460" aria-label="Learn To Fly">
       <g id="plane">
-        <g transform="translate(157.24,140.43) scale(0.30042)">
+        <g transform="translate(157.24,134.43) scale(0.30042)">
           <path d="M49,110 L135,110 L181,172 L69,172 Z" fill="#24abe1"/>
           <path d="M205,39 L297,39 L427,174 L292,174 Z" fill="#18428f"/>
           <path d="M71,173 L186,173 L265,281 L135,281 Z" fill="#0181c7"/>
@@ -234,7 +234,7 @@
           <path d="M433,174 L636,174 L694,280 L530,280 Z" fill="#24abe1"/>
         </g>
       </g>
-      <line id="trace" x1="180.46" y1="226.85" x2="560" y2="226.85" stroke="#24a8d8" stroke-width="2" stroke-linecap="round" stroke-dasharray="379.54" stroke-dashoffset="379.54"/>
+      <line id="trace" x1="184.46" y1="226.85" x2="560" y2="226.85" stroke="#24a8d8" stroke-width="4" stroke-linecap="round" stroke-dasharray="375.54" stroke-dashoffset="375.54"/>
       <g id="word">
         <g transform="translate(164,223) scale(0.41)">
         <text x="652" y="284" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="200" fill="#24abe1">os</text>
@@ -443,7 +443,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on");}, 2500);
 });
 
-const VERSION="v0.11.0";
+const VERSION="v0.11.1";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
