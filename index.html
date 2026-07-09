@@ -148,6 +148,7 @@
   table.fptable input:focus{outline:none; border-color:var(--sky); box-shadow:0 0 0 2px rgba(36,168,216,.15)}
   table.fptable th.num, table.fptable td.num{width:1%}
   .fphint{font-size:10px; color:var(--faint); font-weight:500; margin-top:var(--u1); line-height:1.4; max-width:280px}
+  .fpblocked{width:100%; height:28px; background:repeating-linear-gradient(135deg, var(--panel2), var(--panel2) 4px, var(--line) 4px, var(--line) 8px); border-radius:var(--r1)}
 
   .fpstats{display:flex; gap:var(--u3); margin-top:var(--u4); flex-wrap:wrap}
   .fpstat{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3) var(--u4); flex:1;
@@ -177,7 +178,14 @@
   .maptop{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:var(--u3); padding:0 var(--u1)}
   .maptop .rname{font-weight:700; font-size:16px; color:var(--ink)}
   .maptop .rmeta{font-size:12.5px; color:var(--dim)}
-  .leglist{margin-top:var(--u3)}
+  .fltable{white-space:nowrap}
+  .fltable th{font-size:9.5px; padding:var(--u1) var(--u2)}
+  .fltable td{padding:var(--u1) var(--u2)}
+  .fltable input{width:100%; min-width:52px; padding:var(--u1) var(--u2); font-size:12px; font-weight:600;
+    text-align:center; background:var(--panel2); border:1px solid var(--line); border-radius:var(--r1);
+    color:var(--ink); font-family:var(--font-mono)}
+  .fltable input:focus{outline:none; border-color:var(--sky); box-shadow:0 0 0 2px rgba(36,168,216,.15)}
+  .fltable td.computed{font-family:var(--font-mono); font-weight:700; color:var(--sky); text-align:center}
   .maplegend{position:absolute; top:56px; right:var(--u6); font-size:10.5px; color:var(--dim);
     background:rgba(18,22,31,.92); padding:var(--u2) var(--u3); border-radius:var(--r1); line-height:1.8; border:1px solid var(--line)}
   .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle} /* point-scale exception */
@@ -214,6 +222,17 @@
   .linklist a::after{content:" ↗"; color:var(--faint); font-size:10px}
   .linklist a:hover::after{color:var(--sky)}
 
+  /* Collapsible accordion pattern (Changelog, Fuel Plan worked example) —
+     kept separate from .linkgrid/.linkcat above, which reverted to always-expanded. */
+  .accordion{border-bottom:1px solid var(--line)}
+  .accordion-title{list-style:none; cursor:pointer; padding:var(--u3) 0; font-size:12.5px; font-weight:600;
+    color:var(--text); display:flex; align-items:center; justify-content:space-between; user-select:none}
+  .accordion-title::-webkit-details-marker{display:none}
+  .accordion-title::before{content:"+"; color:var(--sky); font-weight:700; width:var(--u4); display:inline-block}
+  .accordion[open] .accordion-title::before{content:"–"}
+  .accordion-title:hover{color:var(--sky)}
+  .accordion-count{margin-left:auto; color:var(--faint); font-size:10.5px; font-weight:600}
+
   @media(max-width:820px){
     .maplayout{grid-template-columns:1fr}
     .twocol{grid-template-columns:1fr}
@@ -225,7 +244,7 @@
   <div class="logo">
     <svg viewBox="0 0 700 460" aria-label="Learn To Fly">
       <g id="plane">
-        <g transform="translate(157.24,134.43) scale(0.30042)">
+        <g transform="translate(157.24,130.43) scale(0.30042)">
           <path d="M49,110 L135,110 L181,172 L69,172 Z" fill="#24abe1"/>
           <path d="M205,39 L297,39 L427,174 L292,174 Z" fill="#18428f"/>
           <path d="M71,173 L186,173 L265,281 L135,281 Z" fill="#0181c7"/>
@@ -234,7 +253,13 @@
           <path d="M433,174 L636,174 L694,280 L530,280 Z" fill="#24abe1"/>
         </g>
       </g>
-      <line id="trace" x1="184.46" y1="226.85" x2="560" y2="226.85" stroke="#24a8d8" stroke-width="4" stroke-linecap="round" stroke-dasharray="375.54" stroke-dashoffset="375.54"/>
+      <defs>
+        <linearGradient id="traceGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#24a8d8" stop-opacity="1"/>
+          <stop offset="100%" stop-color="#24a8d8" stop-opacity=".1"/>
+        </linearGradient>
+      </defs>
+      <line id="trace" x1="188.46" y1="222.85" x2="560" y2="222.85" stroke="url(#traceGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="371.54" stroke-dashoffset="371.54"/>
       <g id="word">
         <g transform="translate(164,223) scale(0.41)">
         <text x="652" y="284" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="200" fill="#24abe1">os</text>
@@ -310,11 +335,18 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <div class="roadmap" id="roadmap"></div>
       <div class="plabel" style="margin-top:var(--u4)">Quick Links</div>
       <div class="linkgrid" id="linkgrid"></div>
+
+      <div class="plabel" style="margin-top:var(--u6)">Changelog</div>
+      <div id="changelogCurrent" class="hint" style="margin-bottom:var(--u2)"></div>
+      <details class="accordion">
+        <summary class="accordion-title">Full version history<span class="accordion-count" id="changelogCount"></span></summary>
+        <ul class="linklist" id="changelogList" style="padding-left:var(--u4)"></ul>
+      </details>
     </section>
 
     <section class="view" data-view="signout">
       <h1 class="title">Solo Signout</h1>
-      <p class="sub">Weight &amp; Balance, Fuel Plan, and Nav Map — everything needed to sign a student out for solo</p>
+      <p class="hint" id="provenanceNote" style="margin-bottom:var(--u3)"></p>
       <nav class="subtabs" id="subtabs">
         <button data-sv="wb" class="active">Weight &amp; Balance</button>
         <button data-sv="fuel">Fuel Plan</button>
@@ -350,6 +382,27 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <div class="subview" id="sub-fuel" data-sub="fuel">
         <div class="subhead">Fuel Plan</div>
         <p class="sub" style="margin-top:0">Fuel Calculation Plan · SLG, DA40/2, PA44 flight planning sheet format</p>
+        <details class="accordion" style="margin-bottom:var(--u5)">
+          <summary class="accordion-title">Worked example — YMMB → YLEG (LTF instructor handbook)</summary>
+          <table style="margin-top:var(--u2)">
+            <thead><tr><th></th><th class="num">Min</th><th class="num">Litres</th></tr></thead>
+            <tbody>
+              <tr><td>Climb</td><td class="num">0</td><td class="num">0</td></tr>
+              <tr><td>Trip Fuel</td><td class="num">23</td><td class="num">14</td></tr>
+              <tr><td>Dest. Alternate</td><td class="num">32</td><td class="num">19</td></tr>
+              <tr class="sub"><td class="bold">Sub-Total</td><td class="num bold">55</td><td class="num bold">33</td></tr>
+              <tr><td>Contingency Fuel</td><td class="num">0</td><td class="num">0</td></tr>
+              <tr><td>Final Reserve Fuel</td><td class="num">30</td><td class="num">18</td></tr>
+              <tr><td>Holding</td><td class="num">0</td><td class="num">0</td></tr>
+              <tr><td>Additional <span class="hint">(15min LTF fixed reserve + 15min 2×T&amp;G)</span></td><td class="num">30</td><td class="num">18</td></tr>
+              <tr><td>Taxi</td><td class="num">—</td><td class="num">8</td></tr>
+              <tr class="tot"><td class="bold">Fuel Required</td><td class="num bold">115</td><td class="num bold">77</td></tr>
+              <tr><td class="bold">Fuel Margin</td><td class="num bold" style="color:var(--green)">206</td><td class="num bold" style="color:var(--green)">124</td></tr>
+              <tr><td class="bold">Endurance</td><td class="num bold">321</td><td class="num bold">201</td></tr>
+            </tbody>
+          </table>
+          <p class="hint" style="margin-top:var(--u3)">Full route was YMMB→YLEG→YLTV→YMMB (3 legs); only the first leg shown here. Endurance carries forward — this leg's Fuel Margin (124L) plus any planned unburnt reserve/alternate becomes the next leg's starting Endurance figure. This checker currently handles one leg at a time; see instructor handbook for the full multi-leg carry-forward method (CASA AC 91-15 also referenced there).</p>
+        </details>
         <div class="twocol">
           <div class="panel">
             <div class="plabel">Aircraft</div>
@@ -361,7 +414,6 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
               <div class="plabel">Fuel Calculation Plan</div>
               <table id="fpTable"></table>
             </div>
-            <div class="fpstats" id="fpStats"></div>
           </div>
         </div>
         <div class="verdict" id="fpVerdict"></div>
@@ -383,8 +435,12 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
               <span class="swatch" style="background:#4a9fff"></span>Waypoint<br>
               <span class="swatch" style="background:#f5a623"></span>Approx*
             </div>
-            <div class="leglist"><table id="legTable"></table></div>
           </div>
+        </div>
+        <div class="panel" style="margin-top:var(--u4)">
+          <div class="plabel">Flight Log</div>
+          <div class="hint" style="margin-bottom:var(--u3)">TRK(M) and DIST are computed from the route; everything else is yours to plan and fill in — same as the paper flight log.</div>
+          <div style="overflow-x:auto"><table id="legTable" class="fltable"></table></div>
         </div>
         <div class="banner" style="margin-top:var(--u5)">Great-circle tracks &amp; distances, {MAGVAR}°E variation applied for °M.
           Approximate town positions marked *. For cross-checking only — verify against current charts.</div>
@@ -430,6 +486,9 @@ const FLEET=[
 ];
 const ARMS={front:2.30,rear:3.25,bag:3.65,fuel:2.63};
 const LIM={mtow:1200,bag:30};
+// Data currency — surfaced to users, not just kept in code comments (Rule A).
+// Update DATA_VERIFIED whenever fleet/fuel figures are re-confirmed with LTF.
+const DATA_VERIFIED="9 Jul 2026";
 const ENV=[{w:780,a:2.40},{w:980,a:2.40},{w:1150,a:2.462},{w:1200,a:2.48},{w:1200,a:2.59},{w:780,a:2.59}];
 const FUEL_KG_PER_L=135.36/148;
 
@@ -443,7 +502,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on");}, 2500);
 });
 
-const VERSION="v0.11.1";
+const VERSION="v0.15.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -538,6 +597,34 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
   <div class="linkcat-title">${c.cat}</div>
   <ul class="linklist">${c.links.map(l=>`<li><a href="${l.href}" target="_blank" rel="noopener">${l.t}</a></li>`).join("")}</ul>
 </div>`).join("");
+
+// Changelog — most recent first. Kept terse (one line per version); full
+// detail for any entry lives in the project context transfer doc.
+const CHANGELOG=[
+  {v:"v0.15.0",d:"Nav Map's Flight Log rebuilt to match the LTF instructor handbook's exact format: one row per waypoint, TRK(M)/DIST computed from the route, LSALT/ALT/TAS/WIND/HDG/GS/ETA/PLAN/REV/ATA all editable — moved to full page width so 13 columns fit properly."},
+  {v:"v0.14.0",d:"Fuel Plan Checker rebuilt to match the instructor handbook's actual format: Fuel Required/Margin/Endurance are now table rows (not separate stat chips); Endurance-litres is the real input (actual fuel on board) with Margin/Endurance derived from it, using the flying-phase (Sub-Total) burn rate — matches the handbook's worked example within 1 unit. Added From and Additional Fuel Components fields."},
+  {v:"v0.13.0",d:"Quick Links reverted to always-expanded (Changelog + Fuel Plan example keep the collapsed-accordion style). Splash trace line: gradient fade added, cropped 4px more, both trace + aircraft lifted 4px."},
+  {v:"v0.12.0",d:"Quick Links + changelog collapsed by default; Fuel Plan worked example + \"Additional\" row renamed from \"Discretionary\" (matches instructor handbook); Nav Map direction arrows; data-currency note added."},
+  {v:"v0.11.1",d:"Splash: aircraft nudged up 6px, trace line shortened 4px more + doubled thickness."},
+  {v:"v0.11.0",d:"Solo Signout sub-tabs now illuminate automatically as you scroll past each section."},
+  {v:"v0.10.1",d:"Splash: trace line cropped/repositioned, plane precisely anchored to the start of the \"L\"."},
+  {v:"v0.10.0",d:"Splash halved in size, permanent trace line added. Solo Signout, Fuel Plan, and Nav Map merged into one scrollable page."},
+  {v:"v0.9.2",d:"Splash: aircraft + trace line nudged up 8px."},
+  {v:"v0.9.1",d:"Splash aircraft resized to 60%; removed old broken comet-trail effect."},
+  {v:"v0.9.0",d:"Fuel Plan and Nav Map moved from top-level tabs into Solo Signout as sub-tabs."},
+  {v:"v0.8.1",d:"Fixed a real splash rendering bug (CSS animation was overriding SVG positioning)."},
+  {v:"v0.8.0",d:"Splash redesigned — plane rests directly on the wordmark. Nav Map no longer shows aircraft type. Reduced nested scrollboxes app-wide."},
+  {v:"v0.7.1",d:"Added Quick Links — directory of LTF's instructor Linktree, on Home."},
+  {v:"v0.7.0",d:"Applied a strict 4px modular spacing grid across the entire stylesheet."},
+  {v:"v0.6.1",d:"Fuel Plan Checker: fixed Sub-Total row grouping; corrected fleet usable-fuel figures (152L VH-MNN, 188L the rest)."},
+  {v:"v0.6.0",d:"Fuel Plan Checker built — matches the LTF flight planning sheet's Fuel Calculation Plan."},
+  {v:"v0.5.0",d:"Typography (Geist/Geist Mono), real SVG icons, depth/motion polish, CG chart red out-of-bounds state."},
+  {v:"v0.4.1",d:"Fixed splash logo clipping; styled the roadmap's scrollbar."},
+  {v:"v0.4.0",d:"Switched to dark mode; added the Build Roadmap to Home; simplified navigation."},
+];
+$("#changelogCurrent").textContent=`Current: ${VERSION} — ${CHANGELOG[0]?.d||""}`;
+$("#changelogCount").textContent=CHANGELOG.length;
+$("#changelogList").innerHTML=CHANGELOG.map(c=>`<li style="padding:var(--u2) 0"><b style="color:var(--ink);font-family:var(--font-mono)">${c.v}</b> — ${c.d}</li>`).join("");
 
 
 const acSel=$("#ac");
@@ -658,24 +745,36 @@ const FUEL_ROWS=[
   {k:"cont",l:"Contingency Fuel",hint:"Exposition 2.2.1(7): only required for turbojet/large aeroplane — not LTF's piston singles/twins. Confirm with HOO if LTF still wants one entered regardless."},
   {k:"reserve",l:"Final Reserve Fuel",hint:"Exposition 2.2.1(4a): 30 min day-VFR at holding rate (small aeroplane, <5700kg) — 45 min if IFR/night-VFR."},
   {k:"hold",l:"Holding"},
-  {k:"disc",l:"Discretionary",hint:"Exposition 2.2.4: 45 min minimum for training area flights, 60 min minimum for cross-country nav flights."},
-  {k:"taxi",l:"Taxi"},
+  {k:"disc",l:"Additional",hint:"Instructor handbook: covers company reserve vs legal minimum (flight test), airwork/circuit fuel, or personal contingency. LTF policy minimum: 45 min training area / 60 min cross-country (Exposition 2.2.4). Note what it's inclusive of in the field below."},
+  {k:"taxi",l:"Taxi",noMin:true,hint:"Taxi is a fixed litres burn, not a time value — per LTF instructor handbook, this row has no MIN figure."},
 ];
 const fpAcSel=$("#fpAc");
 fpAcSel.innerHTML=FLEET.map(f=>`<option>${f.reg}</option>`).join("");
+const fpRow=r=>`<tr><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num">${r.noMin?'<div class="fpblocked"></div>':`<input type="number" id="fp-${r.k}-m" value="0" min="0">`}</td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"></td></tr>`;
 $("#fpTable").innerHTML=`<thead><tr><th></th><th class="num">Min</th><th class="num">Litres</th></tr></thead>
   <tbody>
-    ${FUEL_ROWS.slice(0,3).map(r=>`<tr><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num"><input type="number" id="fp-${r.k}-m" value="0" min="0"></td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"></td></tr>`).join("")}
+    ${FUEL_ROWS.slice(0,3).map(fpRow).join("")}
     <tr class="sub"><td class="bold">Sub-Total</td><td class="num bold" id="fpSubM"></td><td class="num bold" id="fpSubL"></td></tr>
-    ${FUEL_ROWS.slice(3).map(r=>`<tr><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num"><input type="number" id="fp-${r.k}-m" value="0" min="0"></td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"></td></tr>`).join("")}
+    ${FUEL_ROWS.slice(3).map(fpRow).join("")}
     <tr class="tot"><td class="bold">Fuel Required</td><td class="num bold" id="fpReqM"></td><td class="num bold" id="fpReqL"></td></tr>
+    <tr><td class="bold">Fuel Margin</td><td class="num bold" id="fpMarginM"></td><td class="num bold" id="fpMarginL"></td></tr>
+    <tr><td class="bold">Endurance<div class="fphint">Litres = actual fuel on board at start-up (defaults to this aircraft's usable fuel — reduce if not filled to tabs).</div></td><td class="num bold" id="fpEnduranceM"></td><td class="num"><input type="number" id="fp-endurance-l" value="0" min="0" step="0.1"></td></tr>
+    <tr><td>From</td><td colspan="2"><input type="text" id="fpFrom" placeholder="e.g. YMMB - YLEG" style="text-align:left"></td></tr>
+    <tr><td>Additional Fuel Components</td><td colspan="2"><input type="text" id="fpAdditionalNote" placeholder="What does the Additional row above cover?" style="text-align:left"></td></tr>
   </tbody>`;
 document.querySelectorAll('#fpTable input, #fpAc').forEach(el=>el.addEventListener("input",calcFuelPlan));
+fpAcSel.addEventListener("change",()=>{
+  // Reset Endurance-litres to this aircraft's usable fuel by default (actual fuel on board
+  // at start-up per the handbook's step 6 — instructor can reduce if not filled to tabs).
+  const ac=FLEET.find(f=>f.reg===fpAcSel.value);
+  $("#fp-endurance-l").value=ac.maxFuelL;
+  calcFuelPlan();
+});
 
 function calcFuelPlan(){
   const ac=FLEET.find(f=>f.reg===fpAcSel.value);
   $("#fpAcHint").textContent=`Usable fuel: ${ac.maxFuelL} L (${ac.reg})`;
-  const v=k=>+$(`#fp-${k}-l`).value||0, vm=k=>+$(`#fp-${k}-m`).value||0;
+  const v=k=>+$(`#fp-${k}-l`).value||0, vm=k=>{const el=$(`#fp-${k}-m`); return el?(+el.value||0):0;};
   const subM=vm("climb")+vm("trip")+vm("alt");
   const subL=v("climb")+v("trip")+v("alt");
   $("#fpSubM").textContent=subM.toFixed(0);
@@ -684,17 +783,30 @@ function calcFuelPlan(){
   const reqL=subL+v("cont")+v("reserve")+v("hold")+v("disc")+v("taxi");
   $("#fpReqM").textContent=reqM.toFixed(0);
   $("#fpReqL").textContent=reqL.toFixed(1);
-  const marginL=ac.maxFuelL-reqL;
+
+  // Handbook steps 6-9: Endurance-litres is the actual fuel on board (an input,
+  // not computed) → Fuel Margin (litres) = Endurance − Fuel Required → convert
+  // margin to minutes via this leg's own average burn rate → Endurance (minutes)
+  // = Fuel Required + Fuel Margin (minutes).
+  const enduranceL=+$("#fp-endurance-l").value||0;
+  const marginL=enduranceL-reqL;
+  // Burn rate for converting litres<->minutes on the Margin/Endurance rows uses
+  // the Sub-Total (Climb+Trip+Alternate — the actual flying-phase fuel), not a
+  // blended rate across the whole Fuel Required — reserve/holding/taxi burn at
+  // different characteristic rates and would distort the time conversion.
+  const burnLPerMin=subM>0?subL/subM:null;
+  const marginM=burnLPerMin?marginL/burnLPerMin:null;
+  const enduranceM=marginM!==null?reqM+marginM:null;
   const pass=marginL>=0;
   const started=reqL>0||reqM>0;
+
+  $("#fpReqM").style.color=(pass||!started)?"":"var(--red)";
   $("#fpReqL").style.color=(pass||!started)?"":"var(--red)";
-  const burnLPerMin=reqM>0?reqL/reqM:null;
-  const enduranceM=burnLPerMin?ac.maxFuelL/burnLPerMin:null;
-  $("#fpStats").innerHTML=`
-    <div class="fpstat"><div class="lbl">Usable Fuel (${ac.reg})</div><div class="val">${ac.maxFuelL.toFixed(0)} L</div></div>
-    <div class="fpstat ${(!started||pass)?'':'bad'}"><div class="lbl">Fuel Required</div><div class="val">${reqL.toFixed(1)} L</div></div>
-    <div class="fpstat ${!started?'':(pass?'good':'bad')}"><div class="lbl">Fuel Margin</div><div class="val">${started?(marginL>=0?'+':'')+marginL.toFixed(1)+' L':'—'}</div></div>
-    <div class="fpstat"><div class="lbl">Endurance (est.)</div><div class="val">${enduranceM?enduranceM.toFixed(0)+' min':'—'}</div></div>`;
+  $("#fpMarginM").textContent=marginM!==null?marginM.toFixed(0):"—";
+  $("#fpMarginL").textContent=started?(marginL>=0?"+":"")+marginL.toFixed(1):"—";
+  $("#fpMarginM").style.color=$("#fpMarginL").style.color=!started?"":(pass?"var(--green)":"var(--red)");
+  $("#fpEnduranceM").textContent=enduranceM!==null?enduranceM.toFixed(0):"—";
+
   if(!started){
     $("#fpVerdict").style.borderColor="var(--line)";
     $("#fpVerdict").style.background="var(--panel2)";
@@ -708,11 +820,11 @@ function calcFuelPlan(){
   $("#fpVerdict").style.borderColor=pass?"rgba(34,197,94,.35)":"rgba(242,85,76,.4)";
   $("#fpVerdict").style.background=pass?"rgba(34,197,94,.08)":"rgba(242,85,76,.08)";
   $("#fpVerdict").innerHTML=`<div class="vdot" style="background:${col}"></div>
-    <div><div class="vlabel" style="color:${col}">${pass?"FUEL REQUIRED WITHIN USABLE FUEL":"EXCEEDS USABLE FUEL"}</div>
-    <div class="vsub">${pass?`Fuel required fits within ${ac.reg}'s ${ac.maxFuelL} L usable fuel. Instructor confirms independently before authorising solo.`:`Fuel required exceeds ${ac.reg}'s ${ac.maxFuelL} L usable fuel by ${Math.abs(marginL).toFixed(1)} L — reduce fuel requirement or select a different aircraft.`}</div></div>
+    <div><div class="vlabel" style="color:${col}">${pass?"FUEL REQUIRED WITHIN FUEL ON BOARD":"EXCEEDS FUEL ON BOARD"}</div>
+    <div class="vsub">${pass?`Fuel required fits within ${enduranceL.toFixed(1)} L on board (${ac.reg} usable: ${ac.maxFuelL} L). Instructor confirms independently before authorising solo.`:`Fuel required exceeds the ${enduranceL.toFixed(1)} L entered as on board by ${Math.abs(marginL).toFixed(1)} L — add fuel or reduce the plan.`}</div></div>
     <button class="vbtn" ${pass?"":'style="opacity:.4;cursor:not-allowed" disabled'}>Instructor confirm →</button>`;
 }
-calcFuelPlan();
+fpAcSel.dispatchEvent(new Event("change"));
 
 
 let curRoute=ROUTES[1];
@@ -739,18 +851,51 @@ function drawMap(){
   pts.forEach((p,i)=>{const first=i===0,col=first?"#f47b20":(p.ap?"#f5a623":"#4a9fff");
     dots+=`<circle cx="${sx(p.lon)}" cy="${sy(p.lat)}" r="${first?7:5}" fill="${col}" stroke="#0a1526" stroke-width="2"/>`;
     if(!seen.has(p.code)){seen.add(p.code);dots+=`<text x="${sx(p.lon)+9}" y="${sy(p.lat)+3}" fill="#9aa5bd" font-size="11" font-family="'Geist Mono','JetBrains Mono',monospace" font-weight="600">${p.code}${p.ap?'*':''}</text>`;}});
+  let arrows="";
+  for(let i=0;i<pts.length-1;i++){
+    const ax=sx(pts[i].lon),ay=sy(pts[i].lat),bx=sx(pts[i+1].lon),by=sy(pts[i+1].lat);
+    const mx=(ax+bx)/2,my=(ay+by)/2,ang=Math.atan2(by-ay,bx-ax)*180/Math.PI;
+    arrows+=`<polygon points="-6,-4 6,0 -6,4" fill="#0a1526" stroke="#f47b20" stroke-width="1.5" transform="translate(${mx.toFixed(1)},${my.toFixed(1)}) rotate(${ang.toFixed(1)})"/>`;
+  }
   const tot=Math.round([...Array(pts.length-1)].reduce((s,_,i)=>s+nm(pts[i],pts[i+1]),0));
   $("#map").innerHTML=`<rect width="${W}" height="${H}" fill="#0a1526"/>${grid}
     <path d="${path}" fill="none" stroke="#f47b20" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="3000" stroke-dashoffset="3000">
-      <animate attributeName="stroke-dashoffset" from="3000" to="0" dur="1.4s" fill="freeze"/></path>${dots}`;
+      <animate attributeName="stroke-dashoffset" from="3000" to="0" dur="1.4s" fill="freeze"/></path>${dots}${arrows}`;
   $("#rName").textContent=curRoute.label;
   $("#rMeta").textContent=`${curRoute.legs.length-1} legs · ${tot} nm`;
-  let rows="";
-  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],d=nm(a,b),tt=trk(a,b),tm=(tt-MAGVAR+360)%360,ap=a.ap||b.ap;
-    rows+=`<tr${ap?' style="background:rgba(245,166,35,.10)"':''}><td style="font-family:'Geist Mono','JetBrains Mono',monospace">${a.code}→${b.code}</td><td class="num">${d.toFixed(1)}</td><td class="num">${pad3(tt)}</td><td class="num" style="color:var(--orange);font-weight:700">${pad3(tm)}</td></tr>`;}
-  $("#legTable").innerHTML=`<thead><tr><th>Leg</th><th class="num">nm</th><th class="num">TT</th><th class="num">°M</th></tr></thead><tbody>${rows}</tbody>`;
+
+  // Flight Log — one row per waypoint, matching the LTF instructor handbook's
+  // Flight Log format exactly (WP/LSALT/ALT/TAS/TRK(M)/WIND(M)/HDG(M)/GS/DIST/
+  // ETA MIN/PLAN EST/REV EST/ATA-ATD). TRK(M) and DIST are computed from the
+  // route geometry (same as before); everything performance/weather-dependent
+  // is a blank editable field — this tool can't know planned altitude, TAS,
+  // forecast wind, or heading/GS/ETA derived from them, so it doesn't guess.
+  let flRows="";
+  pts.forEach((p,i)=>{
+    const hasLeg=i>0;
+    const trkCell=hasLeg?pad3((trk(pts[i-1],p)-MAGVAR+360)%360):"";
+    const distCell=hasLeg?nm(pts[i-1],p).toFixed(1):"";
+    flRows+=`<tr>
+      <td style="font-family:var(--font-mono);font-weight:700;color:var(--ink)">${p.code}${p.ap?'*':''}</td>
+      <td><input type="text" id="fl-${i}-lsalt"></td>
+      <td><input type="text" id="fl-${i}-alt"></td>
+      <td><input type="text" id="fl-${i}-tas"></td>
+      <td class="computed">${trkCell}</td>
+      <td><input type="text" id="fl-${i}-wind"></td>
+      <td><input type="text" id="fl-${i}-hdg"></td>
+      <td><input type="text" id="fl-${i}-gs"></td>
+      <td class="computed">${distCell}</td>
+      <td><input type="text" id="fl-${i}-eta"></td>
+      <td><input type="text" id="fl-${i}-plan"></td>
+      <td><input type="text" id="fl-${i}-rev"></td>
+      <td><input type="text" id="fl-${i}-ata"></td>
+    </tr>`;
+  });
+  $("#legTable").innerHTML=`<thead><tr><th>WP</th><th>LSALT</th><th>ALT</th><th>TAS</th><th>TRK(M)</th><th>WIND(M)</th><th>HDG(M)</th><th>GS</th><th>DIST</th><th>ETA MIN</th><th>PLAN EST</th><th>REV EST</th><th>ATA/ATD</th></tr></thead>
+    <tbody>${flRows}</tbody>`;
 }
 renderNavList();
 drawMap();
 document.querySelectorAll('.banner').forEach(b=>{b.innerHTML=b.innerHTML.replace('{MAGVAR}',MAGVAR);});
+$("#provenanceNote").textContent=`Fleet W&B/fuel figures verified ${DATA_VERIFIED} — DA40 W&B sheet v2.2, CASR Exposition v13.0, LTF instructor handbook.`;
 </script>
