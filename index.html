@@ -174,6 +174,9 @@
   .maplayout{display:grid; grid-template-columns:240px 1fr; gap:var(--u4); align-items:start}
   .navmenu{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3); box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
   .navmenu .search{margin-bottom:var(--u3)}
+  .navstage{font-size:10px; letter-spacing:.8px; text-transform:uppercase; color:var(--faint); font-weight:700;
+    padding:var(--u3) var(--u3) var(--u1); margin-top:var(--u1)}
+  .navstage:first-child{margin-top:0}
   .navitem{padding:var(--u3); border-radius:var(--r1); cursor:pointer; font-size:13px; color:var(--dim);
     display:flex; justify-content:space-between; align-items:center; transition:.12s; font-weight:600}
   .navitem:hover{background:var(--panel2); color:var(--text)}
@@ -463,65 +466,67 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 
 <script>
 const MAGVAR=11.5;
-const WP={"YMMB":{"n":"Moorabbin","lat":-37.9778,"lon":145.0998},"YAPO":{"n":"Apollo Bay","lat":-38.7749,"lon":143.6612},"YARA":{"n":"Ararat","lat":-37.31,"lon":142.9887},"YBDG":{"n":"Bendigo","lat":-36.7394,"lon":144.33},"YBLA":{"n":"Benalla","lat":-36.5519,"lon":146.007},"YBNS":{"n":"Bairnsdale","lat":-37.8875,"lon":147.5694},"YBSS":{"n":"Bacchus Marsh","lat":-37.7333,"lon":144.4217},"YCDE":{"n":"Cobden","lat":-38.3234,"lon":143.0566},"YCEM":{"n":"Coldstream","lat":-37.7277,"lon":145.4084},"YCOR":{"n":"Corowa","lat":-35.9947,"lon":146.357},"YDLQ":{"n":"Deniliquin","lat":-35.5594,"lon":144.946},"YDOD":{"n":"Donald","lat":-36.3603,"lon":143.008},"YDRN":{"n":"Drouin","lat":-38.209,"lon":145.8311},"YECH":{"n":"Echuca","lat":-36.1572,"lon":144.762},"YHML":{"n":"Hamilton","lat":-37.6489,"lon":142.065},"YHSM":{"n":"Horsham","lat":-36.6697,"lon":142.173},"YIVE":{"n":"Inverloch","lat":-38.6127,"lon":145.7335},"YKER":{"n":"Kerang","lat":-35.7514,"lon":143.939},"YKTN":{"n":"Kyneton","lat":-37.2263,"lon":144.4473},"YLED":{"n":"Lethbridge","lat":-37.9212,"lon":144.1031},"YLEG":{"n":"Leongatha","lat":-38.4965,"lon":145.8606},"YLTV":{"n":"Latrobe Valley","lat":-38.211,"lon":146.4708},"YMAV":{"n":"Avalon","lat":-38.0403,"lon":144.4672},"YMBU":{"n":"Maryborough","lat":-37.0331,"lon":143.709},"YMEN":{"n":"Essendon","lat":-37.7281,"lon":144.902},"YMFD":{"n":"Mansfield","lat":-37.0739,"lon":146.1207},"YMNG":{"n":"Mangalore","lat":-36.8883,"lon":145.184},"YOLA":{"n":"Colac","lat":-38.2867,"lon":143.68},"YORB":{"n":"Orbost","lat":-37.79,"lon":148.61},"YPBH":{"n":"Peterborough","lat":-38.6072,"lon":142.9038},"YSHT":{"n":"Shepparton","lat":-36.4283,"lon":145.3915},"YTQY":{"n":"Torquay AD","lat":-38.3,"lon":144.365},"YTYA":{"n":"Tyabb","lat":-38.2668,"lon":145.1794},"YWBL":{"n":"Warrnambool","lat":-38.2953,"lon":142.447},"YWGT":{"n":"Wangaratta","lat":-36.4179,"lon":146.3069},"YWHG":{"n":"Wahring","lat":-36.6811,"lon":145.2424},"YWSL":{"n":"West Sale","lat":-38.0908,"lon":146.9653},"YYRM":{"n":"Yarram","lat":-38.5667,"lon":146.7529},"YYWG":{"n":"Yarrawonga","lat":-36.0315,"lon":146.028},"ACE":{"n":"Ace","lat":-37.8958,"lon":145.1806},"APL":{"n":"Airport Lk","lat":-37.8556,"lon":144.975},"BMP":{"n":"Bulla","lat":-37.675,"lon":144.4389},"CARE":{"n":"Cardinia","lat":-37.9583,"lon":145.4167},"COWR":{"n":"Cowwarr","lat":-38.0144,"lon":146.6931},"HEAT":{"n":"Heathcote","lat":-36.9167,"lon":144.7},"KIM":{"n":"Kimbolton","lat":-37.3,"lon":144.9542},"LSR":{"n":"Lake Reeve","lat":-38.05,"lon":147.5833},"MGBH":{"n":"McLoughlins","lat":-38.4489,"lon":147.0992},"MHT":{"n":"Mt Martha","lat":-38.3167,"lon":144.9833},"PIPS":{"n":"Pt Impossible","lat":-38.2933,"lon":144.6333},"SGSV":{"n":"Sugarloaf","lat":-37.675,"lon":145.3},"TON":{"n":"Toolern","lat":-37.8553,"lon":144.7553},"VTG":{"n":"You Yangs","lat":-37.8833,"lon":144.4167},"WMS":{"n":"Williams","lat":-37.8694,"lon":144.9111},"YYM":{"n":"Yan Yean","lat":-38.2472,"lon":145.2508},"Torquay":{"n":"Torquay","lat":-38.33,"lon":144.32,"ap":1},"Terang":{"n":"Terang","lat":-38.24,"lon":142.92,"ap":1},"Mortlake":{"n":"Mortlake","lat":-38.08,"lon":142.79,"ap":1},"Noojee":{"n":"Noojee","lat":-37.91,"lon":145.96,"ap":1},"Dookie":{"n":"Dookie","lat":-36.35,"lon":145.7,"ap":1},"Mathoura":{"n":"Mathoura","lat":-35.81,"lon":144.9,"ap":1},"Yambuna":{"n":"Yambuna","lat":-36.1,"lon":144.92,"ap":1},"Weerite":{"n":"Weerite","lat":-38.25,"lon":143.26,"ap":1},"Cape Liptrap":{"n":"Cape Liptrap","lat":-38.91,"lon":145.95,"ap":1},"Deans Marsh":{"n":"Deans Marsh","lat":-38.35,"lon":143.87,"ap":1}};
+const WP={"YMMB":{"n":"Moorabbin","lat":-37.9778,"lon":145.0998},"YAPO":{"n":"Apollo Bay","lat":-38.7749,"lon":143.6612},"YARA":{"n":"Ararat","lat":-37.31,"lon":142.9887},"YBDG":{"n":"Bendigo","lat":-36.7394,"lon":144.33},"YBLA":{"n":"Benalla","lat":-36.5519,"lon":146.007},"YBNS":{"n":"Bairnsdale","lat":-37.8875,"lon":147.5694},"YBSS":{"n":"Bacchus Marsh","lat":-37.7333,"lon":144.4217},"YCDE":{"n":"Cobden","lat":-38.3234,"lon":143.0566},"YCEM":{"n":"Coldstream","lat":-37.7277,"lon":145.4084},"YCOR":{"n":"Corowa","lat":-35.9947,"lon":146.357},"YDLQ":{"n":"Deniliquin","lat":-35.5594,"lon":144.946},"YDOD":{"n":"Donald","lat":-36.3603,"lon":143.008},"YDRN":{"n":"Drouin","lat":-38.209,"lon":145.8311},"YECH":{"n":"Echuca","lat":-36.1572,"lon":144.762},"YHML":{"n":"Hamilton","lat":-37.6489,"lon":142.065},"YHSM":{"n":"Horsham","lat":-36.6697,"lon":142.173},"YIVE":{"n":"Inverloch","lat":-38.6127,"lon":145.7335},"YKER":{"n":"Kerang","lat":-35.7514,"lon":143.939},"YKTN":{"n":"Kyneton","lat":-37.2263,"lon":144.4473},"YLED":{"n":"Lethbridge","lat":-37.9212,"lon":144.1031},"YLEG":{"n":"Leongatha","lat":-38.4965,"lon":145.8606},"YLTV":{"n":"Latrobe Valley","lat":-38.211,"lon":146.4708},"YMAV":{"n":"Avalon","lat":-38.0403,"lon":144.4672},"YMBU":{"n":"Maryborough","lat":-37.0331,"lon":143.709},"YMEN":{"n":"Essendon","lat":-37.7281,"lon":144.902},"YMFD":{"n":"Mansfield","lat":-37.0739,"lon":146.1207},"YMNG":{"n":"Mangalore","lat":-36.8883,"lon":145.184},"YOLA":{"n":"Colac","lat":-38.2867,"lon":143.68},"YORB":{"n":"Orbost","lat":-37.79,"lon":148.61},"YPBH":{"n":"Peterborough","lat":-38.6072,"lon":142.9038},"YSHT":{"n":"Shepparton","lat":-36.4283,"lon":145.3915},"YTQY":{"n":"Torquay AD","lat":-38.3,"lon":144.365},"YTYA":{"n":"Tyabb","lat":-38.2668,"lon":145.1794},"YWBL":{"n":"Warrnambool","lat":-38.2953,"lon":142.447},"YWGT":{"n":"Wangaratta","lat":-36.4179,"lon":146.3069},"YWHG":{"n":"Wahring","lat":-36.6811,"lon":145.2424},"YWSL":{"n":"West Sale","lat":-38.0908,"lon":146.9653},"YYRM":{"n":"Yarram","lat":-38.5667,"lon":146.7529},"YYWG":{"n":"Yarrawonga","lat":-36.0315,"lon":146.028},"ACE":{"n":"Ace","lat":-37.8958,"lon":145.1806},"APL":{"n":"Airport Lk","lat":-37.8556,"lon":144.975},"BMP":{"n":"Bulla","lat":-37.675,"lon":144.4389},"CARE":{"n":"Cardinia","lat":-37.9583,"lon":145.4167},"COWR":{"n":"Cowwarr","lat":-38.0144,"lon":146.6931},"HEAT":{"n":"Heathcote","lat":-36.9167,"lon":144.7},"KIM":{"n":"Kimbolton","lat":-37.3,"lon":144.9542},"LSR":{"n":"Lake Reeve","lat":-38.05,"lon":147.5833},"MGBH":{"n":"McLoughlins","lat":-38.4489,"lon":147.0992},"MHT":{"n":"Mt Martha","lat":-38.3167,"lon":144.9833},"PIPS":{"n":"Pt Impossible","lat":-38.2933,"lon":144.6333},"SGSV":{"n":"Sugarloaf","lat":-37.675,"lon":145.3},"TON":{"n":"Toolern","lat":-37.8553,"lon":144.7553},"VTG":{"n":"You Yangs","lat":-37.8833,"lon":144.4167},"WMS":{"n":"Williams","lat":-37.8694,"lon":144.9111},"YYM":{"n":"Yan Yean","lat":-38.2472,"lon":145.2508},"Torquay":{"n":"Torquay","lat":-38.33,"lon":144.32,"ap":1},"Terang":{"n":"Terang","lat":-38.24,"lon":142.92,"ap":1},"Mortlake":{"n":"Mortlake","lat":-38.08,"lon":142.79,"ap":1},"Noojee":{"n":"Noojee","lat":-37.91,"lon":145.96,"ap":1},"Dookie":{"n":"Dookie","lat":-36.35,"lon":145.7,"ap":1},"Mathoura":{"n":"Mathoura","lat":-35.81,"lon":144.9,"ap":1},"Yambuna":{"n":"Yambuna","lat":-36.1,"lon":144.92,"ap":1},"Weerite":{"n":"Weerite","lat":-38.25,"lon":143.26,"ap":1},"Cape Liptrap":{"n":"Cape Liptrap","lat":-38.91,"lon":145.95,"ap":1},"Deans Marsh":{"n":"Deans Marsh","lat":-38.35,"lon":143.87,"ap":1},"YSTA":{"n":"St Arnaud (unverified)","lat":-36.62,"lon":143.28,"ap":1}};
 const ROUTES=[
-  // Lesson IDs below are confirmed via exact waypoint-sequence match against
-  // the CPL(A) Integrated syllabus document (retrieved 10 Jul 2026) — every
-  // one of these 16 "Nav Solo" routes matched its corresponding "Navigation
-  // Exercise Solo N" syllabus entry exactly, waypoint for waypoint.
-  //
-  // fullStops: waypoint codes confirmed as full-stop landings via the source
-  // spreadsheet's own cell-level formatting (bold+underline = full stop,
-  // underline only = touch-and-go, no formatting = overflight/turn point —
-  // extracted directly from the .xlsx rich-text runs, not inferred). Where a
-  // route lacks this field, the Flight Log falls back to its old default
-  // (departure + final arrival only).
-  {id:"ppl1",label:"PPL First Solo Nav",ac:"C172",lesson:"CPL(A)-I 44",legs:["YMMB","YLTV","YLEG","YMMB"],fullStops:["YMMB"]},
-  {id:"s1",label:"Nav Solo 1",ac:"DA40",lesson:"CPL(A)-I 55",legs:["YMMB","YLTV","YYRM","YLEG","YMMB"],fullStops:["YMMB"]},
-  {id:"s2",label:"Nav Solo 2",ac:"DA40",lesson:"CPL(A)-I 56",legs:["YMMB","YTYA","YIVE","YYRM","YLTV","YDRN","YCEM","YMMB"],fullStops:["YMMB"]},
-  {id:"s3",label:"Nav Solo 3",ac:"DA40",lesson:"CPL(A)-I 56",legs:["YMMB","YLEG","YLTV","YMMB"],fullStops:["YMMB"]}, // syllabus lists this lesson number twice (Solo 2 and Solo 3) — reproduced as-is, likely a numbering typo in the source, not corrected here
-  {id:"s4",label:"Nav Solo 4",ac:"DA40",lesson:"CPL(A)-I 58",legs:["YMMB","YTYA","PIPS","Torquay","YOLA","YWBL","YLED","VTG","YMMB"],fullStops:["YMMB"]},
-  {id:"s5",label:"Nav Solo 5",ac:"DA40",lesson:"CPL(A)-I 59",legs:["YMMB","APL","TON","BMP","YARA","YMBU","KIM","SGSV","ACE","YMMB"],fullStops:["YMMB"]},
-  {id:"s6",label:"Nav Solo 6",ac:"DA40",lesson:"CPL(A)-I 60",legs:["YMMB","MHT","PIPS","YAPO","Terang","YLED","YMAV","TON","YMMB"],fullStops:["YMMB"]},
-  {id:"s7",label:"Nav Solo 7",ac:"DA40",lesson:"CPL(A)-I 63",legs:["YMMB","MHT","PIPS","Torquay","Weerite","YHML","YARA","BMP","TON","YMMB"],fullStops:["YHML","YARA","YMMB"],
-    qualifies:{minNm:300,fullStops:2,note:"Qualifying flight (syllabus): complete EITHER this route OR Nav Solo 15 — 300nm+, 2 full stops required."}},
-  {id:"s8",label:"Nav Solo 8",ac:"DA40",lesson:"CPL(A)-I 64",legs:["YMMB","YIVE","YLTV","PIPS","YMAV","TON","WMS","YMMB"],fullStops:["YMMB"]},
-  {id:"s9",label:"Nav Solo 9",ac:"DA40",lesson:"CPL(A)-I 65",legs:["YMMB","APL","TON","YBSS","YMAV","PIPS","MHT","YLTV","YLEG","YTYA","YMMB"],fullStops:["YMMB"]},
-  {id:"s10",label:"Nav Solo 10",ac:"DA40",lesson:"CPL(A)-I 67",legs:["YMMB","SGSV","YMFD","YWGT","Yambuna","YSHT","KIM","SGSV","YMMB"],fullStops:["YWGT","YSHT","YMMB"]},
-  {id:"s11",label:"Nav Solo 11",ac:"DA40",lesson:"CPL(A)-I 68",legs:["YMMB","APL","TON","BMP","YDOD","YBDG","KIM","SGSV","YMMB"],fullStops:["YDOD","YBDG","YMMB"]},
-  {id:"s12",label:"Nav Solo 12",ac:"DA40",lesson:"CPL(A)-I 69",legs:["YMMB","SGSV","KIM","YSHT","YCOR","YBLA","YMFD","YCEM","YMMB"],fullStops:["YCOR","YBLA","YMMB"]},
-  {id:"s13",label:"Nav Solo 13",ac:"DA40",lesson:"CPL(A)-I 71",legs:["YMMB","SGSV","KIM","YSHT","Dookie","YWHG","KIM","SGSV","YMMB"],fullStops:["YMMB"]},
-  {id:"s14",label:"Nav Solo 14",ac:"DA40",lesson:"CPL(A)-I 72",legs:["YMMB","YLTV","COWR","YBNS","LSR","YYRM","Cape Liptrap","YLEG","YMMB"],fullStops:["YBNS","YLEG","YMMB"]},
-  {id:"s15",label:"Nav Solo 15",ac:"DA40",lesson:"CPL(A)-I 73",legs:["YMMB","SGSV","KIM","YBDG","YKER","YKTN","KIM","YMMB"],fullStops:["YBDG","YKER","YMMB"], // syllabus notes "(CTA)" near KIM on return leg — an airspace caution, not a separate waypoint
-    qualifies:{minNm:300,fullStops:2,note:"Qualifying flight (syllabus): complete EITHER this route OR Nav Solo 7 — 300nm+, 2 full stops required."}},
-  {id:"s16",label:"Nav Solo 16",ac:"DA40",lesson:"CPL(A)-I 74",legs:["YMMB","YCEM","YYWG","Mathoura","YSHT","KIM","SGSV","YMMB"],fullStops:["YYWG","YSHT","YMMB"]},
+  // Labels below are the EXACT "Lesson Description" text from the syllabus
+  // spreadsheet (standardised to match, not this app's own naming) — e.g.
+  // lesson CPL(A)-I 49's description is literally "Navigation Exercise 9
+  // (Solo)", not an invented name. `stage` reflects the syllabus's own PPL/
+  // CPL boundary as confirmed directly by Nick: PPL = lessons 35-51
+  // inclusive, CPL = 52 onward. fullStops confirmed via the spreadsheet's own
+  // cell-level rich-text formatting (bold+underline = full stop).
 
-  // Genuinely missing from the fleet until now — CPL(A)-I 49 "Navigation
-  // Exercise 9 (Solo)" is a DIFFERENT lesson from "Navigation Exercise Solo 9"
-  // (= s9 above) despite the very similar name; distinct route, distinct
-  // qualifying-flight threshold. Label kept deliberately distinct from "Nav
-  // Solo 9" to avoid the two being confused.
-  {id:"navex9q",label:"Navigation Exercise 9 (Solo) — Qualifying",ac:"DA40",lesson:"CPL(A)-I 49",legs:["YMMB","SGSV","KIM","YSHT","YBDG","KIM","SGSV","YMMB"],fullStops:["YSHT","YBDG","YMMB"],
+  // --- PPL stage (lessons 35-51) ---
+  {id:"navex1",label:"Navigation Exercise 1",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 38",legs:["YMMB","YLEG","YLTV","YMMB"],fullStops:["YMMB"]},
+  {id:"navex2",label:"Navigation Exercise 2",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 39",legs:["YMMB","SGSV","KIM","YBDG","YKTN","YBSS","TON","WMS","YMMB"],fullStops:["YBDG","YMMB"]},
+  {id:"navex3",label:"Navigation Exercise 3",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 40",legs:["YMMB","APL","TON","YMAV","YOLA","YWBL","PIPS","MHT","YMMB"],fullStops:["YOLA","YMMB"]},
+  {id:"navex4",label:"Navigation Exercise 4",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 43",legs:["YMMB","YLTV","YYRM","YLEG","YMMB"],fullStops:["YMMB"]},
+  {id:"ppl1",label:"Navigation Exercise 5 (First Solo Nav)",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 44",legs:["YMMB","YLTV","YLEG","YMMB"],fullStops:["YMMB"]},
+  {id:"navex6",label:"Navigation Exercise 6",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 45",legs:["YMMB","APL","YMEN","CARE","ACE","YMMB"],fullStops:["YMEN","YMMB"]},
+  {id:"navex7",label:"Navigation Exercise 7",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 46",legs:["YMMB","YMEN","YBSS","YBLA","YOLA","YMAV","YMMB"],fullStops:["YMEN","YOLA","YMMB"]}, // source says "YBLT" — substituted verified YBLA, same as prelicb2 below
+  {id:"navex8",label:"Navigation Exercise 8",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 48",legs:["YMMB","YMEN","YSHT","YMFD","YMNG","YMMB"],fullStops:["YMEN","YMMB"]},
+  {id:"navex9q",label:"Navigation Exercise 9 (Solo)",stage:"PPL",ac:"DA40",lesson:"CPL(A)-I 49",legs:["YMMB","SGSV","KIM","YSHT","YBDG","KIM","SGSV","YMMB"],fullStops:["YSHT","YBDG","YMMB"],
     qualifies:{minNm:150,fullStops:2,note:"Qualifying flight (syllabus): 150nm+, 2 full stops required."}},
+  {id:"pplprelic",label:"PPL Pre-Licence",stage:"PPL",ac:"C172",lesson:"CPL(A)-I 50",legs:["YMMB","YMEN","YBDG","YSTA","YMBU","YMMB"],fullStops:["YMEN","YBDG","YMMB"]}, // YSTA (likely St Arnaud) coordinates estimated/unverified — see WP entry
+
+  // --- CPL stage (lesson 52 onward) ---
+  {id:"s1",label:"Navigation Exercise Solo 1",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 55",legs:["YMMB","YLTV","YYRM","YLEG","YMMB"],fullStops:["YMMB"]},
+  {id:"s2",label:"Navigation Exercise Solo 2",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 56",legs:["YMMB","YTYA","YIVE","YYRM","YLTV","YDRN","YCEM","YMMB"],fullStops:["YMMB"]},
+  {id:"s3",label:"Navigation Exercise Solo 3",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 56",legs:["YMMB","YLEG","YLTV","YMMB"],fullStops:["YMMB"]}, // syllabus lists this lesson number twice (Solo 2 and Solo 3) — reproduced as-is, likely a numbering typo in the source, not corrected here
+  {id:"s4",label:"Navigation Exercise Solo 4",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 58",legs:["YMMB","YTYA","PIPS","Torquay","YOLA","YWBL","YLED","VTG","YMMB"],fullStops:["YMMB"]},
+  {id:"s5",label:"Navigation Exercise Solo 5",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 59",legs:["YMMB","APL","TON","BMP","YARA","YMBU","KIM","SGSV","ACE","YMMB"],fullStops:["YMMB"]},
+  {id:"s6",label:"Navigation Exercise Solo 6",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 60",legs:["YMMB","MHT","PIPS","YAPO","Terang","YLED","YMAV","TON","YMMB"],fullStops:["YMMB"]},
+  {id:"s7",label:"Navigation Exercise Solo 7",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 63",legs:["YMMB","MHT","PIPS","Torquay","Weerite","YHML","YARA","BMP","TON","YMMB"],fullStops:["YHML","YARA","YMMB"],
+    qualifies:{minNm:300,fullStops:2,note:"Qualifying flight (syllabus): complete EITHER this route OR Navigation Exercise Solo 15 — 300nm+, 2 full stops required."}},
+  {id:"s8",label:"Navigation Exercise Solo 8",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 64",legs:["YMMB","YIVE","YLTV","PIPS","YMAV","TON","WMS","YMMB"],fullStops:["YMMB"]},
+  {id:"s9",label:"Navigation Exercise Solo 9",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 65",legs:["YMMB","APL","TON","YBSS","YMAV","PIPS","MHT","YLTV","YLEG","YTYA","YMMB"],fullStops:["YMMB"]},
+  {id:"s10",label:"Navigation Exercise Solo 10",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 67",legs:["YMMB","SGSV","YMFD","YWGT","Yambuna","YSHT","KIM","SGSV","YMMB"],fullStops:["YWGT","YSHT","YMMB"]},
+  {id:"s11",label:"Navigation Exercise Solo 11",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 68",legs:["YMMB","APL","TON","BMP","YDOD","YBDG","KIM","SGSV","YMMB"],fullStops:["YDOD","YBDG","YMMB"]},
+  {id:"s12",label:"Navigation Exercise Solo 12",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 69",legs:["YMMB","SGSV","KIM","YSHT","YCOR","YBLA","YMFD","YCEM","YMMB"],fullStops:["YCOR","YBLA","YMMB"]},
+  {id:"s13",label:"Navigation Exercise Solo 13",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 71",legs:["YMMB","SGSV","KIM","YSHT","Dookie","YWHG","KIM","SGSV","YMMB"],fullStops:["YMMB"]},
+  {id:"s14",label:"Navigation Exercise Solo 14",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 72",legs:["YMMB","YLTV","COWR","YBNS","LSR","YYRM","Cape Liptrap","YLEG","YMMB"],fullStops:["YBNS","YLEG","YMMB"]},
+  {id:"s15",label:"Navigation Exercise Solo 15",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 73",legs:["YMMB","SGSV","KIM","YBDG","YKER","YKTN","KIM","YMMB"],fullStops:["YBDG","YKER","YMMB"], // syllabus notes "(CTA)" near KIM on return leg — an airspace caution, not a separate waypoint
+    qualifies:{minNm:300,fullStops:2,note:"Qualifying flight (syllabus): complete EITHER this route OR Navigation Exercise Solo 7 — 300nm+, 2 full stops required."}},
+  {id:"s16",label:"Navigation Exercise Solo 16",stage:"CPL",ac:"DA40",lesson:"CPL(A)-I 74",legs:["YMMB","YCEM","YYWG","Mathoura","YSHT","KIM","SGSV","YMMB"],fullStops:["YYWG","YSHT","YMMB"]},
 
   // Backup/Extra Routes (CPL) — from the syllabus's own "Backup/Extra Routes"
   // list. No lesson-plan number given in the source for these (they're listed
   // as a standing pool, not tied to a specific numbered lesson).
-  {id:"s17",label:"Solo 17 (backup)",ac:"DA40",legs:["YMMB","YTYA","PIPS","YTQY","YOLA","YLED","VTG","YMMB"],fullStops:["YMMB"]},
-  {id:"s18",label:"Solo 18 (backup)",ac:"DA40",legs:["YMMB","WMS","TON","YBSS","YLED","YOLA","YTQY","PIPS","MHT","YMMB"],fullStops:[]}, // syllabus marks YBSS and the final YMMB as touch-and-go only for this one — no full-stop landing recorded anywhere on the route
-  {id:"s19",label:"Solo 19 (backup)",ac:"DA40",legs:["YMMB","MHT","PIPS","YTYA","YIVE","YYRM","YLTV","YLEG","YMMB"],fullStops:["YMMB"]},
-  {id:"s20",label:"Solo 20 (backup)",ac:"DA40",legs:["YMMB","YYRM","YLTV","Noojee","YLEG","YTYA","YMMB"],fullStops:["YMMB"]},
-  {id:"s21",label:"Solo 21 (backup)",ac:"DA40",legs:["YMMB","MHT","PIPS","YCDE","Mortlake","YOLA","YMAV","TON","YMMB"],fullStops:["YMMB"]},
-  {id:"s22",label:"Solo 22 (backup)",ac:"DA40",legs:["YMMB","APL","YBSS","YLED","YAPO","YPBH","YCDE","YTQY","YTYA","YMMB"],fullStops:["YMMB"]},
-  {id:"s23",label:"Solo 23 (backup)",ac:"DA40",legs:["YMMB","APL","TON","YARA","YHSM","YMAV","TON","WMS","YMMB"],fullStops:["YARA","YHSM","YMMB"]},
-  {id:"s24",label:"Solo 24 (backup)",ac:"DA40",legs:["YMMB","SGSV","KIM","YSHT","YDLQ","YWHG","KIM","SGSV","YMMB"],fullStops:["YSHT","YDLQ","YMMB"]},
+  {id:"s17",label:"Solo 17 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","YTYA","PIPS","YTQY","YOLA","YLED","VTG","YMMB"],fullStops:["YMMB"]},
+  {id:"s18",label:"Solo 18 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","WMS","TON","YBSS","YLED","YOLA","YTQY","PIPS","MHT","YMMB"],fullStops:[]}, // syllabus marks YBSS and the final YMMB as touch-and-go only for this one — no full-stop landing recorded anywhere on the route
+  {id:"s19",label:"Solo 19 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","MHT","PIPS","YTYA","YIVE","YYRM","YLTV","YLEG","YMMB"],fullStops:["YMMB"]},
+  {id:"s20",label:"Solo 20 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","YYRM","YLTV","Noojee","YLEG","YTYA","YMMB"],fullStops:["YMMB"]},
+  {id:"s21",label:"Solo 21 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","MHT","PIPS","YCDE","Mortlake","YOLA","YMAV","TON","YMMB"],fullStops:["YMMB"]},
+  {id:"s22",label:"Solo 22 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","APL","YBSS","YLED","YAPO","YPBH","YCDE","YTQY","YTYA","YMMB"],fullStops:["YMMB"]},
+  {id:"s23",label:"Solo 23 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","APL","TON","YARA","YHSM","YMAV","TON","WMS","YMMB"],fullStops:["YARA","YHSM","YMMB"]},
+  {id:"s24",label:"Solo 24 (backup)",stage:"CPL",ac:"DA40",legs:["YMMB","SGSV","KIM","YSHT","YDLQ","YWHG","KIM","SGSV","YMMB"],fullStops:["YSHT","YDLQ","YMMB"]},
 
   // Pre-Licence B — syllabus lists these as diversion exercises ("Div->X" in
   // the source): fly toward the named waypoint, then divert to the named
   // diversion target. Represented here as the full sequence including the
   // diversion point; the diversion nature itself isn't otherwise modelled.
-  {id:"prelicb1",label:"Pre-Licence B (diversion → Noojee)",ac:"DA40",legs:["YMMB","YMEN","YLTV","YYRM","Noojee","YMMB"],fullStops:["YMEN","YMMB"]},
-  {id:"prelicb2",label:"Pre-Licence B (diversion → Deans Marsh)",ac:"DA40",legs:["YMMB","YMEN","YBLA","YARA","Deans Marsh","YMMB"],fullStops:["YMEN","YMMB"]}, // source syllabus says "YBLT" — no such code in this app's waypoint data; substituted the existing verified YBLA (Benalla) as the most likely match. Needs confirming with LTF, not guessed coordinates for an unverified code.
+  {id:"prelicb1",label:"Pre-Licence B (diversion → Noojee)",stage:"CPL",ac:"DA40",legs:["YMMB","YMEN","YLTV","YYRM","Noojee","YMMB"],fullStops:["YMEN","YMMB"]},
+  {id:"prelicb2",label:"Pre-Licence B (diversion → Deans Marsh)",stage:"CPL",ac:"DA40",legs:["YMMB","YMEN","YBLA","YARA","Deans Marsh","YMMB"],fullStops:["YMEN","YMMB"]}, // source syllabus says "YBLT" — no such code in this app's waypoint data; substituted the existing verified YBLA (Benalla) as the most likely match. Needs confirming with LTF, not guessed coordinates for an unverified code.
 ];
 const FLEET=[
   // maxFuelL = usable fuel per aircraft, litres.
@@ -552,7 +557,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.18.0";
+const VERSION="v0.19.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -651,6 +656,7 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // Changelog — most recent first. Kept terse (one line per version); full
 // detail for any entry lives in the project context transfer doc.
 const CHANGELOG=[
+  {v:"v0.19.0",d:"Nav Map: added the 8 missing PPL-stage nav exercises (lessons 38-50), every route renamed to match the syllabus's exact lesson description (e.g. \"Navigation Exercise 9 (Solo)\", not an invented name), and the route list now groups into PPL / CPL sections matching the syllabus's own confirmed boundary (lessons 35-51 = PPL, 52+ = CPL) — 36 routes total, up from 28."},
   {v:"v0.18.0",d:"Favicon added (transparent-background plane icon). Nav Map's Full Stop checkboxes now use real per-waypoint data extracted directly from the syllabus spreadsheet's cell formatting (bold+underline = full stop), replacing the old departure/arrival-only default — fixed a real double-counting bug this surfaced (a route's confirmed final-YMMB full-stop was also matching the always-present departure YMMB)."},
   {v:"v0.17.0",d:"Nav Map routes matched against the full CPL(A) Integrated syllabus: all 16 Nav Solo routes confirmed exact-match against their syllabus lesson (real lesson IDs added, replacing last round's single unconfirmed LP45 tag), 2 real qualifying-flight thresholds wired in with live pass/fail against actual computed distance, 1 missing syllabus route added, plus 8 backup routes and 2 pre-licence diversion routes — 11 new routes total, 28 overall."},
   {v:"v0.16.0",d:"No more scrollbar during splash (invisible app content was still occupying layout space). Fuel Plan's Climb row starts greyed out/read-only (click to enable) since LTF doesn't typically use it. Nav Map: lesson number tag (LP45 confirmed for PPL First Solo Nav), Full Stop checkboxes per waypoint, qualifying-cross-country note, greyed-out \"Custom Route\" placeholder."},
@@ -885,12 +891,19 @@ function calcFuelPlan(){
 fpAcSel.dispatchEvent(new Event("change"));
 
 
-let curRoute=ROUTES[1];
+let curRoute=ROUTES.find(r=>r.id==="ppl1")||ROUTES[0];
 function routeDist(r){let d=0;for(let i=0;i<r.legs.length-1;i++)d+=nm(WP[r.legs[i]],WP[r.legs[i+1]]);return d;}
 function renderNavList(f=""){
   const q=f.toLowerCase();
-  $("#navList").innerHTML=ROUTES.filter(r=>r.label.toLowerCase().includes(q)).map(r=>
-    `<div class="navitem ${r.id===curRoute.id?'active':''}" data-id="${r.id}"><span>${r.label}${r.lesson?` <span style="color:var(--sky);font-family:var(--font-mono);font-size:10px">${r.lesson}</span>`:""}</span><small>${routeDist(r).toFixed(0)}nm</small></div>`).join("");
+  const matches=ROUTES.filter(r=>r.label.toLowerCase().includes(q));
+  const stages=["PPL","CPL"];
+  $("#navList").innerHTML=stages.map(stage=>{
+    const group=matches.filter(r=>r.stage===stage);
+    if(!group.length) return "";
+    return `<div class="navstage">${stage}</div>` + group.map(r=>
+      `<div class="navitem ${r.id===curRoute.id?'active':''}" data-id="${r.id}"><span>${r.label}${r.lesson?` <span style="color:var(--sky);font-family:var(--font-mono);font-size:10px">${r.lesson}</span>`:""}</span><small>${routeDist(r).toFixed(0)}nm</small></div>`
+    ).join("");
+  }).join("");
   document.querySelectorAll(".navitem").forEach(el=>el.addEventListener("click",()=>{
     curRoute=ROUTES.find(r=>r.id===el.dataset.id); renderNavList($("#navSearch").value); drawMap();
   }));
