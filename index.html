@@ -666,7 +666,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.38.0";
+const VERSION="v0.40.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -701,13 +701,14 @@ const subSpy=new IntersectionObserver(entries=>{
 },{rootMargin:"-120px 0px -70% 0px", threshold:0});
 document.querySelectorAll(".subview").forEach(el=>subSpy.observe(el));
 
-// Build roadmap order: Module 1 is Solo Signout (the one actually built), 2–6 continue the planned build.
+// Build roadmap order: Module 1 is Solo Signout (the one actually built), 2–7 continue the planned build.
 const MODS=[
   {t:"Solo Signout Checker",d:"W&B, CG envelope, and fuel plan checks — all live. Nav verification next.",s:"live",v:"signout"},
+  {t:"Maintenance Tracker",d:"Aircraft schedules, defects, service due.",s:"planned"},
+  {t:"Instructor Activity",d:"Productivity tracking — hours flown/taught per instructor.",s:"planned"},
   {t:"Circuit Booking",d:"YMMB circuit bookings, 2-week window, FlightLogger link.",s:"planned"},
   {t:"Flight Data Dashboard",d:"Consolidated FlightLogger data & utilisation.",s:"planned"},
   {t:"Student Master View",d:"Progress, exam results, KDR tracking.",s:"planned"},
-  {t:"Maintenance Tracker",d:"Aircraft schedules, defects, service due.",s:"planned"},
   {t:"Command Centre",d:"Real-time whole-of-business overview.",s:"planned"},
 ];
 $("#roadmap").innerHTML=MODS.map((m,i)=>`<div class="rmnode ${m.s==='live'?'live':''}" ${m.v?`onclick="goView('${m.v}')"`:""}>
@@ -792,6 +793,8 @@ $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
 }).join("");
 
 const CHANGELOG=[
+  {v:"v0.40.0",d:"Reverted last version's Live Data Integrity reordering (back to original 8, original order) — that change was meant for the Build Roadmap instead. Build Roadmap: Maintenance Tracker moved to #2, new Instructor Activity module added at #3 (productivity tracking — hours flown/taught per instructor), rest of the roadmap shifted down accordingly. 7 modules total."},
+  {v:"v0.39.0",d:"Live Data Integrity: reordered — Aircraft Maintenance Status moved to #2, and a new Instructor Activity (Productivity Tracking) checker added at #3 (pending, via FlightLogger — the same plausible source as the Bookings & Student Currency checker, since it already tracks hours). FlightLogger itself now sits at #4. 9 checkers total, column alignment still holds with the new (longer) label added."},
   {v:"v0.38.0",d:"Header row made thinner (76px→68px), logo still comfortably fits. Aircraft Maintenance Status now reads \"Google Drive API not connected\" matching LTF SOPs & Forms' wording. Live Data Integrity: connected (green) checkers now turn their entire spinner circle solid green, not just the top arc — pending/amber checkers keep the original partial-ring look, so the two states read more distinctly from each other."},
   {v:"v0.37.0",d:"Header: fixed the plane no longer landing cleanly on the wordmark — shifting the wordmark up two rounds ago (to align with the nav tabs) didn't shift the plane by the same amount, so it had started overlapping into the letters instead of sitting above them; both now move together, clean gap restored. Also fixed the plane not actually leaving the screen before flying in: its offscreen offset is set via CSS on an element inside the SVG's own viewBox, where pixel values are interpreted as viewBox units rather than final screen pixels — at the logo's current size that meant a nominal 140px offset was only ever producing about 20 real screen pixels of movement. Increased to a value that produces a genuine full off-screen start regardless of the logo's current display size."},
   {v:"v0.36.0",d:"Header: plane fly-in now waits 1 second before starting. Logo made bigger again (74px→100px wide) — this time also increased the header's own height (60px→76px) rather than keep squeezing a larger logo into the same fixed space. \"LTFos\" wordmark now aligns its top with the actual text-ink top of \"Home\"/\"Solo Signout\" (measured via real pixel colour, not the nav buttons' own DOM boxes, which report the full clickable area rather than the visible text) — required re-tuning the \"os\" position slightly again, since the logo's overall size changed and the same font-hinting effect from two rounds ago reappears at each new size."},
