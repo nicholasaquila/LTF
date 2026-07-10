@@ -74,7 +74,8 @@
     background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20}
   .brand{display:flex; align-items:center; gap:var(--u2); font-weight:800; font-size:16px; letter-spacing:-.2px; color:var(--ink)}
   .brand .os{color:var(--sky)}
-  .brand svg{width:32px; height:21px; overflow:visible} /* traced logo aspect ratio — not a grid value, do not change */
+  .brand svg{width:32px; height:21px; overflow:visible; transform:translateX(-140px); transition:transform .7s cubic-bezier(.2,.8,.3,1)} /* traced logo aspect ratio — not a grid value, do not change */
+  #app.on .brand svg{transform:translateX(0)}
   nav.tabs{display:flex; gap:var(--u1); height:100%}
   nav.tabs button{background:transparent; border:none; color:var(--dim); padding:0 var(--u4); height:100%;
     font-size:13px; font-weight:600; cursor:pointer; transition:.15s; box-shadow:inset 0 -2px 0 transparent}
@@ -124,6 +125,24 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,.04); transition:border-color .25s, box-shadow .25s}
   .panel.envfail{border-color:rgba(242,85,76,.55); box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 0 0 1px rgba(242,85,76,.12)}
   .plabel{font-size:10.5px; letter-spacing:1.2px; text-transform:uppercase; color:var(--faint); font-weight:700; margin-bottom:var(--u4)}
+
+  /* Aircraft SOP live integrity checker — placeholder for the eventual Google
+     Drive API connection (see project TODO). Spinner runs white for a few
+     turns, settles to amber on the last turn (not spinning after that), and
+     the warning text fades in at the same moment — reads as "checked, and
+     the result is: not connected yet," not a generic infinite loading spinner. */
+  .sopcheck{display:flex; align-items:center; gap:var(--u2); font-size:11.5px}
+  .sop-spinner{width:14px; height:14px; border-radius:50%; flex:0 0 auto;
+    border:2px solid rgba(255,255,255,.15); border-top-color:#fff;
+    animation:sopSpin 1.8s cubic-bezier(.4,0,.2,1) forwards}
+  @keyframes sopSpin{
+    0%{transform:rotate(0)}
+    80%{transform:rotate(1080deg); border-top-color:#fff}
+    100%{transform:rotate(1080deg); border-top-color:var(--amber)}
+  }
+  .sop-label{color:var(--faint); font-weight:600}
+  .sop-warning{color:var(--amber); font-weight:600; opacity:0; animation:sopWarnIn .3s ease 1.8s forwards}
+  @keyframes sopWarnIn{to{opacity:1}}
   label.f{display:block; margin-bottom:var(--u3)}
   label.f span{display:block; font-size:12.5px; color:var(--dim); margin-bottom:var(--u2); font-weight:500}
   input,select{width:100%; background:var(--panel2); color:var(--ink); border:1px solid var(--line);
@@ -355,7 +374,14 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
     </section>
 
     <section class="view" data-view="signout">
-      <h1 class="title">Solo Signout</h1>
+      <div style="display:flex; align-items:center; gap:var(--u4); flex-wrap:wrap">
+        <h1 class="title" style="margin-bottom:0">Solo Signout</h1>
+        <div class="sopcheck" title="Placeholder — will show live SOP/data-integrity status once the Google Drive API connection is built (see project TODO)">
+          <div class="sop-spinner"></div>
+          <span class="sop-label">Aircraft SOP — Live Integrity Check</span>
+          <span class="sop-warning">Awaiting company Google Drive API connection — figures not live, not for operational use.</span>
+        </div>
+      </div>
       <p class="hint" id="provenanceNote" style="margin-bottom:var(--u3)"></p>
       <nav class="subtabs" id="subtabs">
         <button data-sv="wb" class="active">Weight &amp; Balance</button>
@@ -562,7 +588,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.24.0";
+const VERSION="v0.25.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -661,6 +687,7 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // Changelog — most recent first. Kept terse (one line per version); full
 // detail for any entry lives in the project context transfer doc.
 const CHANGELOG=[
+  {v:"v0.25.0",d:"Header logo now flies in from off-screen left as the app loads. Added a placeholder Aircraft SOP live integrity checker next to the Solo Signout title — spinner runs white then settles to amber, warning shows once connected: awaiting the Google Drive API integration (see project TODO)."},
   {v:"v0.24.0",d:"Fuel Plan Checker: fixed two real conversion bugs found via user report — (1) typing a multi-digit number (e.g. \"60\") into Trip or Alternate could get stuck showing the result for only the first digit typed, caused by a self-referential feedback loop where Trip/Alt's own auto-filled value was being fed back into the rate that converts it; (2) directly typing real figures into both sides of a row no longer lets one overwrite the other — once you've deliberately set both, they stay exactly as you entered them."},
   {v:"v0.23.0",d:"Fuel Plan Checker: MIN↔LITRES conversion now starts working from the very first keystroke, using DA40's documented 75% cruise fuel flow (41.6 L/hr) as a starting rate — your own Climb/Trip/Alternate figures take over and refine it the moment they're entered."},
   {v:"v0.22.0",d:"Fuel Plan Checker: Trip/Alternate/Contingency/Reserve/Holding/Additional now convert bidirectionally between MIN and LITRES — edit either field, the other follows, using the same Sub-Total-derived burn rate already used for the Margin/Endurance chain (not a separate manually-entered rate)."},
