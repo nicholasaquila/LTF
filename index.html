@@ -38,6 +38,7 @@
   }
   *{box-sizing:border-box}
   html{margin:0;height:100%}
+  html{scrollbar-gutter:stable} /* reserves scrollbar space up front — stops the splash logo shifting when overflow later switches to auto and a scrollbar appears */
   body{margin:0;height:100%; overflow:hidden}
   /* Every scrollbar in the app — page included — uses this same thin, rounded,
      sky-accent-on-dark-track treatment. One rule, applies everywhere, so a
@@ -70,12 +71,13 @@
   /* SHELL */
   #app{opacity:0; transition:opacity .5s ease; min-height:100vh; display:flex; flex-direction:column}
   #app.on{opacity:1}
-  header.top{display:flex; align-items:center; gap:var(--u5); padding:0 var(--u6); height:60px;
+  header.top{display:flex; align-items:center; gap:var(--u5); padding:0 var(--u6); height:68px;
     background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20}
   .brand{display:flex; align-items:center; gap:var(--u2); font-weight:800; font-size:16px; letter-spacing:-.2px; color:var(--ink)}
   .brand .os{color:var(--sky); font-style:italic; font-family:Arial,Helvetica,sans-serif}
-  .brand svg{width:32px; height:21px; overflow:visible; transform:translateX(-140px); transition:transform .7s cubic-bezier(.2,.8,.3,1)} /* traced logo aspect ratio — not a grid value, do not change */
-  #app.on .brand svg{transform:translateX(0)}
+  .brand svg{width:100px; height:auto; overflow:visible} /* full splash composition (plane+LTF+os) — wordmark static, only the plane flies in, see .brand-plane below */
+  .brand-plane{transform:translate(-1050px,0); transition:transform .7s cubic-bezier(.2,.8,.3,1) 1s} /* -1050 viewBox user-units (not CSS px, since this targets an element inside the SVG's own viewBox context) ~= 150 real screen px at this logo's current scale — genuinely off-screen, not just partially shifted */
+  #app.on .brand-plane{transform:translate(0,0)}
   nav.tabs{display:flex; gap:var(--u1); height:100%}
   nav.tabs button{background:transparent; border:none; color:var(--dim); padding:0 var(--u4); height:100%;
     font-size:13px; font-weight:600; cursor:pointer; transition:.15s; box-shadow:inset 0 -2px 0 transparent}
@@ -145,7 +147,7 @@
   @keyframes sopSpinGreen{
     0%{transform:rotate(0)}
     80%{transform:rotate(1080deg); border-top-color:#fff}
-    100%{transform:rotate(1080deg); border-top-color:var(--green)}
+    100%{transform:rotate(1080deg); border-color:var(--green)}
   }
   .sop-warning.ok{color:var(--green)}
   .sop-label{color:var(--faint); font-weight:600}
@@ -153,8 +155,10 @@
   #app.on .sop-warning{animation-play-state:running}
   @keyframes sopWarnIn{to{opacity:1}}
   .intgrid{display:flex; flex-direction:column}
-  .intgrid .sopcheck{padding:var(--u3) 0; border-top:1px solid var(--line2); flex-wrap:wrap}
+  .intgrid .sopcheck{padding:var(--u3) 0; border-top:1px solid var(--line2);
+    display:grid; grid-template-columns:14px 300px 1fr; column-gap:var(--u3); align-items:center}
   .intgrid .sopcheck:first-child{border-top:none}
+  .sop-prefix{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.3px}
   label.f{display:block; margin-bottom:var(--u3)}
   label.f span{display:block; font-size:12.5px; color:var(--dim); margin-bottom:var(--u2); font-weight:500}
   input,select{width:100%; background:var(--panel2); color:var(--ink); border:1px solid var(--line);
@@ -348,15 +352,56 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 <div id="app">
   <header class="top">
     <div class="brand">
-      <svg viewBox="0 0 759 303">
-        <path d="M49,110 L135,110 L181,172 L69,172 Z" fill="#24abe1"/>
-        <path d="M205,39 L297,39 L427,174 L292,174 Z" fill="#18428f"/>
-        <path d="M71,173 L186,173 L265,281 L135,281 Z" fill="#0181c7"/>
-        <path d="M188,173 L291,173 L372,281 L267,281 Z" fill="#24abe1"/>
-        <path d="M294,173 L430,173 L527,280 L373,280 Z" fill="#1e2476"/>
-        <path d="M433,174 L636,174 L694,280 L530,280 Z" fill="#24abe1"/>
+      <svg viewBox="0 0 700 460" aria-label="LTF OS">
+        <g class="brand-plane">
+        <g transform="translate(157.24,81.33) scale(0.30042)">
+          <path d="M49,110 L135,110 L181,172 L69,172 Z" fill="#24abe1"/>
+          <path d="M205,39 L297,39 L427,174 L292,174 Z" fill="#18428f"/>
+          <path d="M71,173 L186,173 L265,281 L135,281 Z" fill="#0181c7"/>
+          <path d="M188,173 L291,173 L372,281 L267,281 Z" fill="#24abe1"/>
+          <path d="M294,173 L430,173 L527,280 L373,280 Z" fill="#1e2476"/>
+          <path d="M433,174 L636,174 L694,280 L530,280 Z" fill="#24abe1"/>
+        </g>
+        </g>
+        <g transform="translate(164,173.9) scale(0.41)">
+          <text x="652" y="128.43" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="200" fill="#24abe1">os</text>
+          <g transform="translate(0,307) scale(0.1,-0.1)" fill="#18428f" stroke="none">
+            <path d="M5074 2780 c-51 -7 -124 -32 -174 -57 -14 -7 -31 -13 -37 -13 -7 0
+-13 -4 -13 -10 0 -5 -5 -10 -12 -10 -6 0 -34 -19 -62 -42 -86 -73 -133 -133
+-179 -230 -29 -62 -49 -152 -103 -463 -7 -44 -20 -116 -28 -160 -16 -90 -41
+-231 -61 -350 -30 -172 -70 -401 -101 -570 -8 -44 -21 -120 -29 -170 -9 -49
+-22 -124 -29 -165 -8 -41 -22 -113 -31 -160 -8 -47 -18 -104 -22 -127 l-6 -43
+305 0 305 0 12 55 c7 31 19 95 27 143 7 48 21 125 30 172 8 47 22 122 30 168
+8 45 20 119 28 165 8 45 22 123 31 172 10 50 20 110 24 135 l6 45 485 5 485 5
+10 75 c6 41 13 80 16 85 4 6 9 38 13 72 4 34 13 93 21 130 8 38 15 74 15 81 0
+9 -103 12 -480 12 -264 0 -480 1 -480 3 0 1 7 40 15 87 8 47 20 114 25 150 24
+159 43 223 80 261 20 21 52 41 75 48 27 7 200 11 517 11 269 0 479 4 482 9 3
+5 13 40 21 77 9 38 23 96 31 129 9 33 21 83 27 110 7 28 15 55 19 60 3 6 8 23
+9 39 4 29 3 30 -61 42 -140 26 -1100 44 -1236 24z"/>
+            <path d="M552 2697 c-6 -45 -16 -109 -22 -142 -18 -105 -39 -223 -55 -308 -15
+-83 -24 -132 -50 -287 -8 -47 -22 -123 -31 -170 -8 -47 -22 -121 -29 -165 -8
+-44 -20 -116 -28 -160 -8 -44 -22 -127 -31 -185 -9 -58 -19 -111 -21 -119 -3
+-7 -12 -57 -21 -110 -9 -53 -22 -132 -30 -176 -37 -207 -38 -306 -3 -403 46
+-127 119 -193 274 -247 39 -14 96 -18 265 -22 302 -6 1028 22 1047 40 2 3 11
+65 19 138 9 74 20 163 24 199 5 36 9 82 9 103 l1 37 -482 0 c-364 0 -489 3
+-507 13 -32 16 -54 81 -42 121 6 17 13 58 16 91 4 33 10 69 15 80 4 11 13 54
+19 95 6 41 18 111 26 155 8 44 22 123 30 177 8 53 19 116 24 140 9 40 26 135
+52 288 6 36 17 101 26 145 8 44 21 116 28 160 8 44 20 116 28 160 8 44 22 121
+30 172 9 51 20 116 25 145 6 29 13 68 16 86 l6 33 -309 -1 -308 -1 -11 -82z"/>
+            <path d="M2237 2753 c-3 -16 -9 -57 -13 -93 -3 -36 -10 -69 -14 -75 -4 -5 -11
+-41 -15 -80 -4 -38 -10 -78 -15 -90 -4 -11 -10 -46 -14 -77 l-7 -58 365 0
+c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
+-100 -26 -150 -9 -49 -23 -126 -30 -170 -7 -44 -23 -134 -35 -200 -12 -66 -24
+-133 -26 -150 -5 -32 -26 -149 -45 -250 -6 -33 -17 -98 -25 -145 -7 -47 -21
+-123 -30 -170 -26 -137 -43 -240 -55 -320 -6 -41 -13 -82 -16 -90 -7 -17 -9
+-28 -17 -82 l-6 -38 308 0 309 0 17 103 c10 56 22 125 28 152 10 50 27 147 53
+300 7 44 21 121 30 170 9 50 23 126 30 170 7 44 14 80 15 80 1 0 8 36 15 80
+17 104 50 296 70 410 10 50 23 126 31 170 7 44 21 121 29 170 9 50 22 124 29
+165 6 41 15 81 20 88 5 9 93 12 371 12 360 0 364 0 376 21 10 19 19 65 53 279
+7 41 15 82 18 90 4 8 9 36 12 63 l6 47 -1059 0 -1058 0 -6 -27z"/>
+          </g>
+        </g>
       </svg>
-      LTF<span class="os">os</span>
     </div>
     <nav class="tabs" id="tabs">
       <button data-v="home" class="active">Home</button>
@@ -381,7 +426,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 
       <div class="plabel" style="margin-top:var(--u6)">Changelog</div>
       <div id="changelogCurrent" class="hint" style="margin-bottom:var(--u2)"></div>
-      <details class="accordion">
+      <details class="accordion" style="display:none"> <!-- full history hidden per request; still populated below, just not exposed in the UI -->
         <summary class="accordion-title">Full version history<span class="accordion-count" id="changelogCount"></span></summary>
         <ul class="linklist" id="changelogList" style="padding-left:var(--u4)"></ul>
       </details>
@@ -457,8 +502,14 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
           <div class="panel">
             <div class="plabel">Aircraft</div>
             <label class="f"><span>Aircraft</span><select id="fpAc"></select><div class="hint" id="fpAcHint"></div></label>
+            <label class="f" style="margin-top:var(--u3)"><span>Cruise Power Setting</span>
+              <select id="fpPowerSetting">
+                <option value="55" selected>55% Best Power (8.5 USG/hr)</option>
+                <option value="75">75% Best Power (11 USG/hr)</option>
+              </select>
+              <div class="hint">Sets the starting MIN↔LITRES conversion rate below (your own Climb/Trip/Alternate figures always take over once entered) — both figures from DA40 SOP. Changing this refreshes any row still holding an auto-filled value; anything you've typed yourself stays untouched.</div>
+            </label>
             <div class="hint" style="margin-top:var(--u1)">Usable fuel is specific to the selected tail — checked against that aircraft's own figure, not a fleet-wide number.</div>
-            <div class="hint" style="margin-top:var(--u1)">MIN↔LITRES conversion below starts from DA40's documented 75% cruise fuel flow (41.6 L/hr) — enter your own Climb/Trip/Alternate figures and the rate switches to reflect this actual flight instead.</div>
 
           </div>
           <div>
@@ -583,6 +634,19 @@ const FLEET=[
   {reg:"VH-YHH",bew:811.5,arm:2.4909,maxFuelL:188},{reg:"VH-JHH",bew:790.1,arm:2.4585,maxFuelL:188},
   {reg:"VH-XPP",bew:821.0,arm:2.4810,maxFuelL:188},
   {reg:"VH-NOO",bew:796.5,arm:2.4740,maxFuelL:188},{reg:"VH-MII",bew:794.5,arm:2.4683,maxFuelL:188},
+  // VH-DXR: DA40 long-range tanks, added this session. BEW 796.1kg given
+  // directly; arm computed from the given moment (1970235.2) ÷ BEW = 2474.86
+  // — an order of magnitude outside every other tail's arm (all ~2.4-2.5m),
+  // so the moment figure was almost certainly given in kg·mm rather than
+  // kg·m (a common W&B convention), not kg·m directly. Divided by 1000 to
+  // get 2.4749m, which sits right in the middle of the rest of the fleet's
+  // range — treated as confirmation the unit read is correct, not proof.
+  // maxFuelL: no figure was given for this tail specifically, so inherited
+  // the same 188L already used for the fleet's other long-range-tank
+  // aircraft (matching "long range tanks" in the same way those are) rather
+  // than the DA40 SOP's generic 189.3L long-range figure — if this specific
+  // tail's actual usable fuel differs, needs correcting with the real number.
+  {reg:"VH-DXR",bew:796.1,arm:2.4749,maxFuelL:188},
 ];
 const ARMS={front:2.30,rear:3.25,bag:3.65,fuel:2.63};
 const LIM={mtow:1200,bag:30};
@@ -602,7 +666,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.30.0";
+const VERSION="v0.38.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -707,26 +771,35 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // each just runs the same "check → not yet live" animation, staggered so
 // they visibly run one after another rather than all firing at once.
 const INTEGRITY_CHECKS=[
-  {label:"LTF SOPs & Forms (Google Drive)", warn:"Awaiting company Google Drive API connection — figures not live, not for operational use."},
-  {label:"FlightLogger (Bookings & Student Currency)", warn:"Awaiting FlightLogger integration — bookings and student currency data are not live."},
-  {label:"Aircraft Maintenance Status", warn:"No maintenance data source connected yet — MR/unserviceability status is not live."},
-  {label:"ERSA (Aerodrome Data)", ok:true, warn:"Connected — aerodrome data syncing on current AIRAC cycle."},
-  {label:"NOTAMs / Area NOTAMs", ok:true, warn:"Connected — NOTAM feed live."},
-  {label:"Airspace Boundaries (CTA/PRD)", ok:true, warn:"Connected — map overlay reflects current CTA/PRD boundaries."},
-  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", ok:true, warn:"Connected — qualifying-flight thresholds synced to the current MOS."},
-  {label:"Live Weather (TAFs / AWIS)", warn:"Awaiting live weather integration — current TAFs/AWIS not available yet."},
+  {label:"LTF SOPs & Forms (Google Drive)", warn:"Google Drive API not connected — figures not live, not for operational use."},
+  {label:"FlightLogger (Bookings & Student Currency)", warn:"FlightLogger integration not connected — bookings and student currency data not live."},
+  {label:"Aircraft Maintenance Status", warn:"Google Drive API not connected — MR/unserviceability status not live."},
+  {label:"ERSA (Aerodrome Data)", ok:true, warn:"Aerodrome data synced, current AIRAC cycle."},
+  {label:"NOTAMs / Area NOTAMs", ok:true, warn:"NOTAM feed live."},
+  {label:"Airspace Boundaries (CTA/PRD)", ok:true, warn:"Map overlay reflects current CTA/PRD boundaries."},
+  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", ok:true, warn:"Qualifying-flight thresholds synced to current MOS."},
+  {label:"Live Weather (TAFs / AWIS)", warn:"Live weather integration not connected — current TAFs/AWIS not available."},
 ];
 const SPIN_DUR=1.8;
 $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
   const spinDelay=(i*SPIN_DUR).toFixed(2), warnDelay=(i*SPIN_DUR+SPIN_DUR).toFixed(2);
+  const prefix=c.ok?"[FETCH SUCCESS]":"[FETCH FAILED]";
   return `<div class="sopcheck">
     <div class="sop-spinner${c.ok?' ok':''}" style="animation-delay:${spinDelay}s"></div>
     <span class="sop-label">${c.label}</span>
-    <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s">${c.warn}</span>
+    <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s"><span class="sop-prefix">${prefix}</span> — ${c.warn}</span>
   </div>`;
 }).join("");
 
 const CHANGELOG=[
+  {v:"v0.38.0",d:"Header row made thinner (76px→68px), logo still comfortably fits. Aircraft Maintenance Status now reads \"Google Drive API not connected\" matching LTF SOPs & Forms' wording. Live Data Integrity: connected (green) checkers now turn their entire spinner circle solid green, not just the top arc — pending/amber checkers keep the original partial-ring look, so the two states read more distinctly from each other."},
+  {v:"v0.37.0",d:"Header: fixed the plane no longer landing cleanly on the wordmark — shifting the wordmark up two rounds ago (to align with the nav tabs) didn't shift the plane by the same amount, so it had started overlapping into the letters instead of sitting above them; both now move together, clean gap restored. Also fixed the plane not actually leaving the screen before flying in: its offscreen offset is set via CSS on an element inside the SVG's own viewBox, where pixel values are interpreted as viewBox units rather than final screen pixels — at the logo's current size that meant a nominal 140px offset was only ever producing about 20 real screen pixels of movement. Increased to a value that produces a genuine full off-screen start regardless of the logo's current display size."},
+  {v:"v0.36.0",d:"Header: plane fly-in now waits 1 second before starting. Logo made bigger again (74px→100px wide) — this time also increased the header's own height (60px→76px) rather than keep squeezing a larger logo into the same fixed space. \"LTFos\" wordmark now aligns its top with the actual text-ink top of \"Home\"/\"Solo Signout\" (measured via real pixel colour, not the nav buttons' own DOM boxes, which report the full clickable area rather than the visible text) — required re-tuning the \"os\" position slightly again, since the logo's overall size changed and the same font-hinting effect from two rounds ago reappears at each new size."},
+  {v:"v0.35.0",d:"Fuel Plan: removed the 65% cruise power option (was an interpolated estimate, not a real SOP figure) — now just 55%/75%, both from DA40's own documentation, defaulting to 55%. Changing the power setting now refreshes every row's auto-derived side using the new rate, without touching anything you've typed yourself. Added VH-DXR (DA40, long-range tanks) to the fleet — arm computed from the given moment, which turned out to be in kg·mm rather than kg·m (an order of magnitude outside the rest of the fleet's arms otherwise). Nav Map: DA40 routes now default each leg's TAS to N0120 in the Flight Log, still fully editable; C172 routes unaffected."},
+  {v:"v0.34.0",d:"Header logo made bigger (61px→74px wide, still comfortably inside the header). W&B's Fuel field and the Fuel Plan's Endurance-litres field now sync bidirectionally — same real quantity (fuel on board), editing either updates the other. Added a Cruise Power Setting selector under the Fuel Plan's aircraft dropdown (55%/65%/75%, defaults to 65%) driving the MIN↔LITRES starting rate — 55%/75% are DA40's own documented SOP figures, 65% is flagged in its own tooltip as a straight-line estimate between them since the SOP doesn't cover that setting for this type. Fixed the splash logo shifting slightly when the page's scrollbar appears (scrollbar-gutter:stable, reserves the space up front so its later appearance doesn't change the viewport width)."},
+  {v:"v0.33.0",d:"Header logo: fixed a real bug where \"os\" was aligned to the plane's own navy-coloured segment instead of the actual \"LTF\" letters (the plane reuses the same navy fill, and an earlier fix's pixel search wasn't scoped to exclude it) — now genuinely aligned to the letters themselves, confirmed to within 0.03px across two viewport sizes. Also changed the fly-in animation: the \"LTFos\" wordmark is now static from load, and only the plane animates in and lands on top of it, rather than the whole logo sliding in together."},
+  {v:"v0.32.0",d:"Changelog: hid the \"Full version history\" accordion from the UI (button and expandable list no longer shown) — still fully populated and updated behind the scenes each version, just not exposed for now. Live Data Integrity: status text now aligns in a consistent column across all 8 checkers regardless of label length (grid layout, not flexbox), and every message is prefixed [FETCH SUCCESS] / [FETCH FAILED] matching each checker's connected/pending state."},
+  {v:"v0.31.0",d:"Header logo replaced with the exact same composed graphic as the splash screen (plane + traced LTF letters + os text, not a separate small icon plus HTML text) — same fill colours, same relative layout, matched to the header's compact size. Needed its own independently-tuned \"os\" vertical position, not a straight copy of the splash's value: at the header's tiny ~7px effective font size, text rendering doesn't scale perfectly linearly with the vector paths (likely font hinting), so the splash's exact numbers were measurably off by ~8px once actually rendered at header scale — found via direct pixel measurement after initial DOM-based checks gave misleadingly small numbers, fixed with a header-specific value, confirmed aligned to within 0.1px."},
   {v:"v0.30.0",d:"Splash screen: actually fixed the \"os\" alignment this time. Last version's fix was based on the text element's DOM bounding box, which turned out to include font ascender space that lowercase \"os\" never visually uses — checked with a real screenshot and pixel-level colour analysis after the user reported it still looked wrong, found a genuine 11px gap the DOM measurement had missed entirely, and corrected using real ink-pixel positions instead. Verified stable across two different viewport sizes before shipping."},
   {v:"v0.29.0",d:"Splash screen: repositioned the \"os\" text so its top edge aligns exactly with the top of the \"LTF\" letters, instead of sitting baseline-low against them. Measured and confirmed via real Chromium (top-edge difference now under 0.001 viewBox units) rather than assumed from font metrics. Header logo checked too — its \"LTF\"/\"os\" were already effectively top-aligned (sub-pixel difference only), so no change was needed there."},
   {v:"v0.28.0",d:"Header logo text now matches the splash screen's wordmark styling — lowercase \"os\" suffix, italic, same font family (Arial/Helvetica) and sky-blue colour as the splash, rather than its own separate plain-uppercase treatment."},
@@ -771,6 +844,16 @@ $("#changelogList").innerHTML=CHANGELOG.map(c=>`<li style="padding:var(--u2) 0">
 const acSel=$("#ac");
 acSel.innerHTML=FLEET.map(f=>`<option>${f.reg}</option>`).join("");
 ["#ac","#front","#rear","#bag","#fuel"].forEach(s=>$(s).addEventListener("input",calcWB));
+
+// W&B's "Fuel (litres)" and the Fuel Plan's "Endurance" litres both represent
+// the same real-world quantity — actual fuel on board at start-up — so keep
+// them in sync in both directions. Guarded against feedback loops the same
+// way as the Fuel Plan's own row conversions: setting a value via JS (not
+// dispatching a new "input" event) doesn't re-trigger the other side's listener.
+$("#fuel").addEventListener("input",()=>{
+  const el=$("#fp-endurance-l");
+  if(el && el.value!==$("#fuel").value){ el.value=$("#fuel").value; if(typeof calcFuelPlan==="function") calcFuelPlan(); }
+});
 const ICON_CHECK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 const ICON_CROSS='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 const chk=(ok,l)=>`<div class="chk"><span class="i" style="color:${ok?'var(--green)':'var(--red)'}">${ok?ICON_CHECK:ICON_CROSS}</span><span style="color:${ok?'var(--text)':'var(--red)'}">${l}</span></div>`;
@@ -911,13 +994,17 @@ document.querySelectorAll('#fpTable input, #fpAc').forEach(el=>el.addEventListen
 // deliberately excluded, matching how they're already treated everywhere else
 // in this checker.
 const CONVERTIBLE_ROWS=["trip","alt","cont","reserve","hold","disc"];
-// Default starting rate: DA40 75% Best Power cruise fuel flow, 11 USG/hr
-// (ltf-aircraft-sop-data.js, sourced from the type's POH) = 41.64 L/hr =
-// 0.694 L/min. Used only until the user's own Climb/Trip/Alt entries give a
-// real Sub-Total rate for THIS flight — their actual figures always take
-// over once present, same as everywhere else in this app that prefers real
-// entered data over an assumed default.
-const DEFAULT_BURN_LPERMIN=11*3.78541/60;
+// Starting rate options: DA40 Best Power cruise fuel flow, both figures
+// directly from the type's SOP (ltf-aircraft-sop-data.js). Used only until
+// the user's own Climb/Trip/Alt entries give a real Sub-Total rate for THIS
+// flight — their actual figures always take over once present, same as
+// everywhere else in this app that prefers real entered data over an
+// assumed default.
+const POWER_SETTING_USGPERHR={55:8.5, 75:11};
+function defaultBurnLPerMin(){
+  const pct=+$("#fpPowerSetting")?.value||55;
+  return (POWER_SETTING_USGPERHR[pct]||POWER_SETTING_USGPERHR[55])*3.78541/60;
+}
 function subTotalBurnRate(excludeKey){
   // Same rate the Margin/Endurance chain already uses: Sub-Total litres ÷
   // Sub-Total minutes (Climb+Trip+Alternate — the actual flying-phase fuel).
@@ -936,7 +1023,7 @@ function subTotalBurnRate(excludeKey){
   const keys=["climb","trip","alt"].filter(k=>k!==excludeKey);
   const subM=keys.reduce((s,k)=>s+(+$(`#fp-${k}-m`)?.value||0),0);
   const subL=keys.reduce((s,k)=>s+(+$(`#fp-${k}-l`)?.value||0),0);
-  return (subM>0&&subL>0)?subL/subM:DEFAULT_BURN_LPERMIN;
+  return (subM>0&&subL>0)?subL/subM:defaultBurnLPerMin();
 }
 function convertFuelRow(k,changed){
   const burnLPerMin=subTotalBurnRate(k);
@@ -962,6 +1049,12 @@ CONVERTIBLE_ROWS.forEach(k=>{
   if(mEl)mEl.addEventListener("input",()=>{convertFuelRow(k,"m"); calcFuelPlan();});
   if(lEl)lEl.addEventListener("input",()=>{convertFuelRow(k,"l"); calcFuelPlan();});
 });
+// Reverse direction of the W&B <-> Fuel Plan fuel sync (see calcWB section) —
+// same real-world quantity, kept consistent whichever page it's edited from.
+$("#fp-endurance-l").addEventListener("input",()=>{
+  const el=$("#fuel");
+  if(el && el.value!==$("#fp-endurance-l").value){ el.value=$("#fp-endurance-l").value; calcWB(); }
+});
 $("#fpTable").addEventListener("click",e=>{
   const row=e.target.closest(".fp-row-disabled"); if(!row) return;
   row.classList.remove("fp-row-disabled");
@@ -972,6 +1065,22 @@ fpAcSel.addEventListener("change",()=>{
   // at start-up per the handbook's step 6 — instructor can reduce if not filled to tabs).
   const ac=FLEET.find(f=>f.reg===fpAcSel.value);
   $("#fp-endurance-l").value=ac.maxFuelL;
+  calcFuelPlan();
+});
+$("#fpPowerSetting").addEventListener("change",()=>{
+  // Refresh every row's auto-derived side using the new rate. If the user has
+  // typed into one side of a row (making it their own real figure), refresh
+  // only the OTHER side — never overwrite the side they actually entered.
+  // Rows where neither or both sides are user-set are left alone (nothing to
+  // usefully refresh, or both are independently real and shouldn't be
+  // reconciled against each other just because the rate changed).
+  CONVERTIBLE_ROWS.forEach(k=>{
+    const mEl=$(`#fp-${k}-m`), lEl=$(`#fp-${k}-l`);
+    if(!mEl||!lEl) return;
+    const mSet=mEl.dataset.userSet==="1", lSet=lEl.dataset.userSet==="1";
+    if(mSet&&!lSet) convertFuelRow(k,"m");
+    else if(lSet&&!mSet) convertFuelRow(k,"l");
+  });
   calcFuelPlan();
 });
 
@@ -1119,12 +1228,17 @@ function drawMap(){
     const hasLeg=i>0;
     const trkCell=hasLeg?pad3((trk(pts[i-1],p)-MAGVAR+360)%360):"";
     const distCell=hasLeg?nm(pts[i-1],p).toFixed(1):"";
+    // DA40 routes default TAS to N0120 (ICAO flight-plan notation for 120kt
+    // true airspeed) — a sensible planning figure for this type, still fully
+    // editable per-leg since actual TAS depends on power setting/altitude/
+    // conditions for the specific flight.
+    const tasDefault=(hasLeg&&curRoute.ac==="DA40")?"N0120":"";
     flRows+=`<tr>
       <td style="font-family:var(--font-mono);font-weight:700;color:var(--ink)">${p.code}${p.ap?'*':''}</td>
       <td style="text-align:center"><input type="checkbox" id="fl-${i}-fullstop" class="fl-fullstop" ${i===0||(curRoute.fullStops?curRoute.fullStops.includes(p.code):i===pts.length-1)?"checked":""}></td>
       <td><input type="text" id="fl-${i}-lsalt"></td>
       <td><input type="text" id="fl-${i}-alt"></td>
-      <td><input type="text" id="fl-${i}-tas"></td>
+      <td><input type="text" id="fl-${i}-tas" value="${tasDefault}"></td>
       <td class="computed">${trkCell}</td>
       <td><input type="text" id="fl-${i}-wind"></td>
       <td><input type="text" id="fl-${i}-hdg"></td>
