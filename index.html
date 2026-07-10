@@ -303,7 +303,7 @@
       <line id="trace" x1="188.46" y1="222.85" x2="560" y2="222.85" stroke="url(#traceGrad)" stroke-width="4" stroke-linecap="round" stroke-dasharray="371.54" stroke-dashoffset="371.54"/>
       <g id="word">
         <g transform="translate(164,223) scale(0.41)">
-        <text x="652" y="284" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="200" fill="#24abe1">os</text>
+        <text x="652" y="144.97" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-style="italic" font-size="200" fill="#24abe1">os</text>
         <g transform="translate(0,307) scale(0.1,-0.1)" fill="#18428f" stroke="none">
           <path d="M5074 2780 c-51 -7 -124 -32 -174 -57 -14 -7 -31 -13 -37 -13 -7 0
 -13 -4 -13 -10 0 -5 -5 -10 -12 -10 -6 0 -34 -19 -62 -42 -86 -73 -133 -133
@@ -602,7 +602,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.28.0";
+const VERSION="v0.30.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -727,6 +727,8 @@ $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
 }).join("");
 
 const CHANGELOG=[
+  {v:"v0.30.0",d:"Splash screen: actually fixed the \"os\" alignment this time. Last version's fix was based on the text element's DOM bounding box, which turned out to include font ascender space that lowercase \"os\" never visually uses — checked with a real screenshot and pixel-level colour analysis after the user reported it still looked wrong, found a genuine 11px gap the DOM measurement had missed entirely, and corrected using real ink-pixel positions instead. Verified stable across two different viewport sizes before shipping."},
+  {v:"v0.29.0",d:"Splash screen: repositioned the \"os\" text so its top edge aligns exactly with the top of the \"LTF\" letters, instead of sitting baseline-low against them. Measured and confirmed via real Chromium (top-edge difference now under 0.001 viewBox units) rather than assumed from font metrics. Header logo checked too — its \"LTF\"/\"os\" were already effectively top-aligned (sub-pixel difference only), so no change was needed there."},
   {v:"v0.28.0",d:"Header logo text now matches the splash screen's wordmark styling — lowercase \"os\" suffix, italic, same font family (Arial/Helvetica) and sky-blue colour as the splash, rather than its own separate plain-uppercase treatment."},
   {v:"v0.27.0",d:"Integrity section updated."},
   {v:"v0.26.0",d:"Live data integrity section added."},
