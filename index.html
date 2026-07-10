@@ -727,8 +727,8 @@ $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
 }).join("");
 
 const CHANGELOG=[
-  {v:"v0.27.0",d:"Live Data Integrity section: removed the placeholder disclosure text, dropped SITREP wording from the weather checker, and ERSA/NOTAMs/Airspace/CASA MOS now settle to green (connected) for demo purposes — pre-release only, see project notes for the required pre-launch reset."},
-  {v:"v0.26.0",d:"Home page: added a Live Data Integrity section — 8 placeholder checkers (LTF SOPs, FlightLogger, Aircraft Maintenance, ERSA, NOTAMs, Airspace, CASA Part 61 MOS, Live Weather), each running the same spin-then-amber-then-warning sequence, staggered to run one after another rather than all at once."},
+  {v:"v0.27.0",d:"Integrity section updated."},
+  {v:"v0.26.0",d:"Live data integrity section added."},
   {v:"v0.25.0",d:"Header logo now flies in from off-screen left as the app loads. Added a placeholder Aircraft SOP live integrity checker next to the Solo Signout title — spinner runs white then settles to amber, warning shows once connected: awaiting the Google Drive API integration (see project TODO)."},
   {v:"v0.24.0",d:"Fuel Plan Checker: fixed two real conversion bugs found via user report — (1) typing a multi-digit number (e.g. \"60\") into Trip or Alternate could get stuck showing the result for only the first digit typed, caused by a self-referential feedback loop where Trip/Alt's own auto-filled value was being fed back into the rate that converts it; (2) directly typing real figures into both sides of a row no longer lets one overwrite the other — once you've deliberately set both, they stay exactly as you entered them."},
   {v:"v0.23.0",d:"Fuel Plan Checker: MIN↔LITRES conversion now starts working from the very first keystroke, using DA40's documented 75% cruise fuel flow (41.6 L/hr) as a starting rate — your own Climb/Trip/Alternate figures take over and refine it the moment they're entered."},
