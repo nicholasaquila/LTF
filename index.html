@@ -562,7 +562,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.23.0";
+const VERSION="v0.24.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -661,6 +661,7 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // Changelog — most recent first. Kept terse (one line per version); full
 // detail for any entry lives in the project context transfer doc.
 const CHANGELOG=[
+  {v:"v0.24.0",d:"Fuel Plan Checker: fixed two real conversion bugs found via user report — (1) typing a multi-digit number (e.g. \"60\") into Trip or Alternate could get stuck showing the result for only the first digit typed, caused by a self-referential feedback loop where Trip/Alt's own auto-filled value was being fed back into the rate that converts it; (2) directly typing real figures into both sides of a row no longer lets one overwrite the other — once you've deliberately set both, they stay exactly as you entered them."},
   {v:"v0.23.0",d:"Fuel Plan Checker: MIN↔LITRES conversion now starts working from the very first keystroke, using DA40's documented 75% cruise fuel flow (41.6 L/hr) as a starting rate — your own Climb/Trip/Alternate figures take over and refine it the moment they're entered."},
   {v:"v0.22.0",d:"Fuel Plan Checker: Trip/Alternate/Contingency/Reserve/Holding/Additional now convert bidirectionally between MIN and LITRES — edit either field, the other follows, using the same Sub-Total-derived burn rate already used for the Margin/Endurance chain (not a separate manually-entered rate)."},
   {v:"v0.21.0",d:"Nav Map: removed the per-leg oscillating direction arrows (they went back and forth, not one consistent direction) — replaced with a single arrow that continuously flies the whole route in one direction, following the exact path shape, looping indefinitely after the initial trace."},
@@ -845,20 +846,34 @@ const CONVERTIBLE_ROWS=["trip","alt","cont","reserve","hold","disc"];
 // over once present, same as everywhere else in this app that prefers real
 // entered data over an assumed default.
 const DEFAULT_BURN_LPERMIN=11*3.78541/60;
-function subTotalBurnRate(){
+function subTotalBurnRate(excludeKey){
   // Same rate the Margin/Endurance chain already uses: Sub-Total litres ÷
   // Sub-Total minutes (Climb+Trip+Alternate — the actual flying-phase fuel).
   // One consistent conversion factor for the whole checker, not a separate
   // manually-entered rate living alongside a different derived one.
-  const subM=(+$("#fp-climb-m")?.value||0)+(+$("#fp-trip-m")?.value||0)+(+$("#fp-alt-m")?.value||0);
-  const subL=(+$("#fp-climb-l")?.value||0)+(+$("#fp-trip-l")?.value||0)+(+$("#fp-alt-l")?.value||0);
+  //
+  // `excludeKey` matters for Trip/Alt specifically: they're both CONVERTED
+  // using this rate AND part of what the rate is derived FROM. Without
+  // excluding the row currently being edited, a half-typed value (e.g. "6"
+  // typed on the way to "60") gets auto-filled into that row's own litres
+  // field, and the VERY NEXT keystroke then reads that auto-filled (not
+  // user-confirmed) value back into the rate calculation — creating a
+  // self-consistent fixed point that locks the conversion onto a corrupted
+  // rate instead of the real one. Excluding the row being edited from its
+  // own rate derivation breaks that loop.
+  const keys=["climb","trip","alt"].filter(k=>k!==excludeKey);
+  const subM=keys.reduce((s,k)=>s+(+$(`#fp-${k}-m`)?.value||0),0);
+  const subL=keys.reduce((s,k)=>s+(+$(`#fp-${k}-l`)?.value||0),0);
   return (subM>0&&subL>0)?subL/subM:DEFAULT_BURN_LPERMIN;
 }
 function convertFuelRow(k,changed){
-  const burnLPerMin=subTotalBurnRate();
+  const burnLPerMin=subTotalBurnRate(k);
   if(!burnLPerMin) return; // no Sub-Total rate available yet (Climb/Trip/Alt not filled in) — leave both fields as independently entered
   const mEl=$(`#fp-${k}-m`), lEl=$(`#fp-${k}-l`);
   if(!mEl||!lEl) return;
+  const src=changed==="m"?mEl:lEl, dst=changed==="m"?lEl:mEl;
+  src.dataset.userSet="1"; // whichever field the user just typed into is now their own authoritative figure
+  if(dst.dataset.userSet==="1") return; // never overwrite a field the user has separately, deliberately set themselves — even if it doesn't perfectly match the current rate, their own two known figures win over a derived one
   // Round up in both directions (matches the handbook's own "always round
   // values up" rule for minutes→litres — applied consistently to the reverse
   // direction too, biasing toward more fuel/time accounted for, never less).
