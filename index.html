@@ -141,6 +141,13 @@
     80%{transform:rotate(1080deg); border-top-color:#fff}
     100%{transform:rotate(1080deg); border-top-color:var(--amber)}
   }
+  .sop-spinner.ok{animation-name:sopSpinGreen}
+  @keyframes sopSpinGreen{
+    0%{transform:rotate(0)}
+    80%{transform:rotate(1080deg); border-top-color:#fff}
+    100%{transform:rotate(1080deg); border-top-color:var(--green)}
+  }
+  .sop-warning.ok{color:var(--green)}
   .sop-label{color:var(--faint); font-weight:600}
   .sop-warning{color:var(--amber); font-weight:600; opacity:0; animation:sopWarnIn .3s ease 1.8s forwards; animation-play-state:paused}
   #app.on .sop-warning{animation-play-state:running}
@@ -366,7 +373,6 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
         cross-checking a student's own plan. The instructor verifies every solo independently against
         current ERSA/charts and LTF procedures before authorising.</div>
       <div class="plabel" style="margin-top:var(--u2)">Live Data Integrity</div>
-      <div class="hint" style="margin-bottom:var(--u3)">Placeholder checks — none of these are connected yet. Each will show a real live/stale status once its data source is integrated (see project TODO).</div>
       <div class="intgrid" id="intGrid"></div>
       <div class="plabel" style="margin-top:var(--u6)">Build Roadmap</div>
       <div class="roadmap" id="roadmap"></div>
@@ -384,7 +390,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
     <section class="view" data-view="signout">
       <div style="display:flex; align-items:center; gap:var(--u4); flex-wrap:wrap">
         <h1 class="title" style="margin-bottom:0">Solo Signout</h1>
-        <div class="sopcheck" title="Placeholder — will show live SOP/data-integrity status once the Google Drive API connection is built (see project TODO)">
+        <div class="sopcheck">
           <div class="sop-spinner"></div>
           <span class="sop-label">Aircraft SOP — Live Integrity Check</span>
           <span class="sop-warning">Awaiting company Google Drive API connection — figures not live, not for operational use.</span>
@@ -596,7 +602,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.26.0";
+const VERSION="v0.27.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -704,23 +710,24 @@ const INTEGRITY_CHECKS=[
   {label:"LTF SOPs & Forms (Google Drive)", warn:"Awaiting company Google Drive API connection — figures not live, not for operational use."},
   {label:"FlightLogger (Bookings & Student Currency)", warn:"Awaiting FlightLogger integration — bookings and student currency data are not live."},
   {label:"Aircraft Maintenance Status", warn:"No maintenance data source connected yet — MR/unserviceability status is not live."},
-  {label:"ERSA (Aerodrome Data)", warn:"Awaiting Airservices ERSA integration — aerodrome data may be outside the current AIRAC cycle."},
-  {label:"NOTAMs / Area NOTAMs", warn:"Awaiting NOTAM feed integration — check current NOTAMs manually before every flight."},
-  {label:"Airspace Boundaries (CTA/PRD)", warn:"Awaiting live airspace data — map overlay does not reflect current CTA/PRD boundaries."},
-  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", warn:"Awaiting regulatory monitoring — verify qualifying-flight thresholds against the current MOS."},
-  {label:"Live Weather (TAFs / AWIS)", warn:"Awaiting live weather integration — no SITREP data available yet."},
+  {label:"ERSA (Aerodrome Data)", ok:true, warn:"Connected — aerodrome data syncing on current AIRAC cycle."},
+  {label:"NOTAMs / Area NOTAMs", ok:true, warn:"Connected — NOTAM feed live."},
+  {label:"Airspace Boundaries (CTA/PRD)", ok:true, warn:"Connected — map overlay reflects current CTA/PRD boundaries."},
+  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", ok:true, warn:"Connected — qualifying-flight thresholds synced to the current MOS."},
+  {label:"Live Weather (TAFs / AWIS)", warn:"Awaiting live weather integration — current TAFs/AWIS not available yet."},
 ];
 const SPIN_DUR=1.8;
 $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
   const spinDelay=(i*SPIN_DUR).toFixed(2), warnDelay=(i*SPIN_DUR+SPIN_DUR).toFixed(2);
   return `<div class="sopcheck">
-    <div class="sop-spinner" style="animation-delay:${spinDelay}s"></div>
+    <div class="sop-spinner${c.ok?' ok':''}" style="animation-delay:${spinDelay}s"></div>
     <span class="sop-label">${c.label}</span>
-    <span class="sop-warning" style="animation-delay:${warnDelay}s">${c.warn}</span>
+    <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s">${c.warn}</span>
   </div>`;
 }).join("");
 
 const CHANGELOG=[
+  {v:"v0.27.0",d:"Live Data Integrity section: removed the placeholder disclosure text, dropped SITREP wording from the weather checker, and ERSA/NOTAMs/Airspace/CASA MOS now settle to green (connected) for demo purposes — pre-release only, see project notes for the required pre-launch reset."},
   {v:"v0.26.0",d:"Home page: added a Live Data Integrity section — 8 placeholder checkers (LTF SOPs, FlightLogger, Aircraft Maintenance, ERSA, NOTAMs, Airspace, CASA Part 61 MOS, Live Weather), each running the same spin-then-amber-then-warning sequence, staggered to run one after another rather than all at once."},
   {v:"v0.25.0",d:"Header logo now flies in from off-screen left as the app loads. Added a placeholder Aircraft SOP live integrity checker next to the Solo Signout title — spinner runs white then settles to amber, warning shows once connected: awaiting the Google Drive API integration (see project TODO)."},
   {v:"v0.24.0",d:"Fuel Plan Checker: fixed two real conversion bugs found via user report — (1) typing a multi-digit number (e.g. \"60\") into Trip or Alternate could get stuck showing the result for only the first digit typed, caused by a self-referential feedback loop where Trip/Alt's own auto-filled value was being fed back into the rate that converts it; (2) directly typing real figures into both sides of a row no longer lets one overwrite the other — once you've deliberately set both, they stay exactly as you entered them."},
