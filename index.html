@@ -666,7 +666,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.40.0";
+const VERSION="v0.41.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -791,8 +791,32 @@ $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
     <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s"><span class="sop-prefix">${prefix}</span> — ${c.warn}</span>
   </div>`;
 }).join("");
+// Once the full sequence has naturally played through once, lock every
+// checker into its final look via inline styles (highest specificity,
+// overrides the CSS animation outright) rather than leaving it to the
+// animation classes. CSS animations restart from the beginning whenever an
+// element goes from display:none back to displayed — since Home does
+// exactly that every time you navigate away and back, without this the
+// whole spin-in sequence would replay on every single return visit. This
+// runs once, after the splash's own reveal delay (2.5s) plus the time the
+// slowest (last-staggered) checker needs to finish, with a small buffer for
+// its final fade-in transition.
+setTimeout(()=>{
+  document.querySelectorAll("#intGrid .sop-spinner").forEach((el,i)=>{
+    const c=INTEGRITY_CHECKS[i];
+    el.style.animation="none";
+    el.style.transform="none";
+    if(c.ok) el.style.borderColor="var(--green)";
+    else{ el.style.borderColor="rgba(255,255,255,.15)"; el.style.borderTopColor="var(--amber)"; }
+  });
+  document.querySelectorAll("#intGrid .sop-warning").forEach(el=>{
+    el.style.animation="none";
+    el.style.opacity="1";
+  });
+}, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.41.0",d:"Live Data Integrity checkers on Home now only play their spin-in sequence once per page load — after finishing, each one locks into its final look (colour, full/partial ring, visible status text) via inline styles, so navigating to another tab and back no longer replays the whole sequence from white. The Solo Signout page's own single SOP checker is unaffected and still replays every visit, as intended."},
   {v:"v0.40.0",d:"Reverted last version's Live Data Integrity reordering (back to original 8, original order) — that change was meant for the Build Roadmap instead. Build Roadmap: Maintenance Tracker moved to #2, new Instructor Activity module added at #3 (productivity tracking — hours flown/taught per instructor), rest of the roadmap shifted down accordingly. 7 modules total."},
   {v:"v0.39.0",d:"Live Data Integrity: reordered — Aircraft Maintenance Status moved to #2, and a new Instructor Activity (Productivity Tracking) checker added at #3 (pending, via FlightLogger — the same plausible source as the Bookings & Student Currency checker, since it already tracks hours). FlightLogger itself now sits at #4. 9 checkers total, column alignment still holds with the new (longer) label added."},
   {v:"v0.38.0",d:"Header row made thinner (76px→68px), logo still comfortably fits. Aircraft Maintenance Status now reads \"Google Drive API not connected\" matching LTF SOPs & Forms' wording. Live Data Integrity: connected (green) checkers now turn their entire spinner circle solid green, not just the top arc — pending/amber checkers keep the original partial-ring look, so the two states read more distinctly from each other."},
