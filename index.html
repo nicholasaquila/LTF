@@ -36,7 +36,8 @@
     --r1:4px; --r2:8px; /* border-radius scale — 2 steps is enough, circles stay 50% */
   }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
+  html{margin:0;height:100%}
+  body{margin:0;height:100%; overflow:hidden}
   /* Every scrollbar in the app — page included — uses this same thin, rounded,
      sky-accent-on-dark-track treatment. One rule, applies everywhere, so a
      scroller never looks like an unstyled default regardless of where it shows up. */
@@ -149,6 +150,10 @@
   table.fptable th.num, table.fptable td.num{width:1%}
   .fphint{font-size:10px; color:var(--faint); font-weight:500; margin-top:var(--u1); line-height:1.4; max-width:280px}
   .fpblocked{width:100%; height:28px; background:repeating-linear-gradient(135deg, var(--panel2), var(--panel2) 4px, var(--line) 4px, var(--line) 8px); border-radius:var(--r1)}
+  .fp-row-disabled{cursor:pointer; opacity:.45}
+  .fp-row-disabled:hover{opacity:.7}
+  .fp-row-disabled input{cursor:pointer}
+  .fp-row-disabled td:first-child::after{content:" · click to enable"; color:var(--faint); font-size:10px; font-style:italic}
 
   .fpstats{display:flex; gap:var(--u3); margin-top:var(--u4); flex-wrap:wrap}
   .fpstat{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3) var(--u4); flex:1;
@@ -426,6 +431,9 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
           <div class="navmenu">
             <input class="search" id="navSearch" placeholder="Filter routes…">
             <div id="navList"></div>
+            <div class="navitem" style="opacity:.4; cursor:not-allowed; margin-top:var(--u2); border-top:1px solid var(--line); padding-top:var(--u3)" title="Coming soon — needs custom-route infrastructure built first">
+              <span>+ Custom Route</span><small>WIP</small>
+            </div>
           </div>
           <div class="maparea">
             <div class="maptop"><div class="rname" id="rName">—</div><div class="rmeta" id="rMeta"></div></div>
@@ -439,8 +447,9 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
         </div>
         <div class="panel" style="margin-top:var(--u4)">
           <div class="plabel">Flight Log</div>
-          <div class="hint" style="margin-bottom:var(--u3)">TRK(M) and DIST are computed from the route; everything else is yours to plan and fill in — same as the paper flight log.</div>
+          <div class="hint" style="margin-bottom:var(--u3)">TRK(M) and DIST are computed from the route; everything else is yours to plan and fill in — same as the paper flight log. Departure and final arrival are checked as full-stop by default — tick/untick any waypoint to mark an actual full-stop landing (vs. touch-and-go / overfly).</div>
           <div style="overflow-x:auto"><table id="legTable" class="fltable"></table></div>
+          <div class="hint" id="qualNavNote" style="margin-top:var(--u3)"></div>
         </div>
         <div class="banner" style="margin-top:var(--u5)">Great-circle tracks &amp; distances, {MAGVAR}°E variation applied for °M.
           Approximate town positions marked *. For cross-checking only — verify against current charts.</div>
@@ -455,7 +464,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 const MAGVAR=11.5;
 const WP={"YMMB":{"n":"Moorabbin","lat":-37.9778,"lon":145.0998},"YAPO":{"n":"Apollo Bay","lat":-38.7749,"lon":143.6612},"YARA":{"n":"Ararat","lat":-37.31,"lon":142.9887},"YBDG":{"n":"Bendigo","lat":-36.7394,"lon":144.33},"YBLA":{"n":"Benalla","lat":-36.5519,"lon":146.007},"YBNS":{"n":"Bairnsdale","lat":-37.8875,"lon":147.5694},"YBSS":{"n":"Bacchus Marsh","lat":-37.7333,"lon":144.4217},"YCDE":{"n":"Cobden","lat":-38.3234,"lon":143.0566},"YCEM":{"n":"Coldstream","lat":-37.7277,"lon":145.4084},"YCOR":{"n":"Corowa","lat":-35.9947,"lon":146.357},"YDLQ":{"n":"Deniliquin","lat":-35.5594,"lon":144.946},"YDOD":{"n":"Donald","lat":-36.3603,"lon":143.008},"YDRN":{"n":"Drouin","lat":-38.209,"lon":145.8311},"YECH":{"n":"Echuca","lat":-36.1572,"lon":144.762},"YHML":{"n":"Hamilton","lat":-37.6489,"lon":142.065},"YHSM":{"n":"Horsham","lat":-36.6697,"lon":142.173},"YIVE":{"n":"Inverloch","lat":-38.6127,"lon":145.7335},"YKER":{"n":"Kerang","lat":-35.7514,"lon":143.939},"YKTN":{"n":"Kyneton","lat":-37.2263,"lon":144.4473},"YLED":{"n":"Lethbridge","lat":-37.9212,"lon":144.1031},"YLEG":{"n":"Leongatha","lat":-38.4965,"lon":145.8606},"YLTV":{"n":"Latrobe Valley","lat":-38.211,"lon":146.4708},"YMAV":{"n":"Avalon","lat":-38.0403,"lon":144.4672},"YMBU":{"n":"Maryborough","lat":-37.0331,"lon":143.709},"YMEN":{"n":"Essendon","lat":-37.7281,"lon":144.902},"YMFD":{"n":"Mansfield","lat":-37.0739,"lon":146.1207},"YMNG":{"n":"Mangalore","lat":-36.8883,"lon":145.184},"YOLA":{"n":"Colac","lat":-38.2867,"lon":143.68},"YORB":{"n":"Orbost","lat":-37.79,"lon":148.61},"YPBH":{"n":"Peterborough","lat":-38.6072,"lon":142.9038},"YSHT":{"n":"Shepparton","lat":-36.4283,"lon":145.3915},"YTQY":{"n":"Torquay AD","lat":-38.3,"lon":144.365},"YTYA":{"n":"Tyabb","lat":-38.2668,"lon":145.1794},"YWBL":{"n":"Warrnambool","lat":-38.2953,"lon":142.447},"YWGT":{"n":"Wangaratta","lat":-36.4179,"lon":146.3069},"YWHG":{"n":"Wahring","lat":-36.6811,"lon":145.2424},"YWSL":{"n":"West Sale","lat":-38.0908,"lon":146.9653},"YYRM":{"n":"Yarram","lat":-38.5667,"lon":146.7529},"YYWG":{"n":"Yarrawonga","lat":-36.0315,"lon":146.028},"ACE":{"n":"Ace","lat":-37.8958,"lon":145.1806},"APL":{"n":"Airport Lk","lat":-37.8556,"lon":144.975},"BMP":{"n":"Bulla","lat":-37.675,"lon":144.4389},"CARE":{"n":"Cardinia","lat":-37.9583,"lon":145.4167},"COWR":{"n":"Cowwarr","lat":-38.0144,"lon":146.6931},"HEAT":{"n":"Heathcote","lat":-36.9167,"lon":144.7},"KIM":{"n":"Kimbolton","lat":-37.3,"lon":144.9542},"LSR":{"n":"Lake Reeve","lat":-38.05,"lon":147.5833},"MGBH":{"n":"McLoughlins","lat":-38.4489,"lon":147.0992},"MHT":{"n":"Mt Martha","lat":-38.3167,"lon":144.9833},"PIPS":{"n":"Pt Impossible","lat":-38.2933,"lon":144.6333},"SGSV":{"n":"Sugarloaf","lat":-37.675,"lon":145.3},"TON":{"n":"Toolern","lat":-37.8553,"lon":144.7553},"VTG":{"n":"You Yangs","lat":-37.8833,"lon":144.4167},"WMS":{"n":"Williams","lat":-37.8694,"lon":144.9111},"YYM":{"n":"Yan Yean","lat":-38.2472,"lon":145.2508},"Torquay":{"n":"Torquay","lat":-38.33,"lon":144.32,"ap":1},"Terang":{"n":"Terang","lat":-38.24,"lon":142.92,"ap":1},"Mortlake":{"n":"Mortlake","lat":-38.08,"lon":142.79,"ap":1},"Noojee":{"n":"Noojee","lat":-37.91,"lon":145.96,"ap":1},"Dookie":{"n":"Dookie","lat":-36.35,"lon":145.7,"ap":1},"Mathoura":{"n":"Mathoura","lat":-35.81,"lon":144.9,"ap":1},"Yambuna":{"n":"Yambuna","lat":-36.1,"lon":144.92,"ap":1},"Weerite":{"n":"Weerite","lat":-38.25,"lon":143.26,"ap":1},"Cape Liptrap":{"n":"Cape Liptrap","lat":-38.91,"lon":145.95,"ap":1}};
 const ROUTES=[
-  {id:"ppl1",label:"PPL First Solo Nav",ac:"C172",legs:["YMMB","YLTV","YLEG","YMMB"]},
+  {id:"ppl1",label:"PPL First Solo Nav",ac:"C172",lesson:"LP45",legs:["YMMB","YLTV","YLEG","YMMB"]},
   {id:"s1",label:"Nav Solo 1",ac:"DA40",legs:["YMMB","YLTV","YYRM","YLEG","YMMB"]},
   {id:"s2",label:"Nav Solo 2",ac:"DA40",legs:["YMMB","YTYA","YIVE","YYRM","YLTV","YDRN","YCEM","YMMB"]},
   {id:"s3",label:"Nav Solo 3",ac:"DA40",legs:["YMMB","YLEG","YLTV","YMMB"]},
@@ -499,10 +508,10 @@ const $=s=>document.querySelector(s);
 const pad3=n=>String(Math.round(n)).padStart(3,"0");
 
 window.addEventListener("load",()=>{
-  setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on");}, 2500);
+  setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.15.0";
+const VERSION="v0.16.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -601,6 +610,7 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // Changelog — most recent first. Kept terse (one line per version); full
 // detail for any entry lives in the project context transfer doc.
 const CHANGELOG=[
+  {v:"v0.16.0",d:"No more scrollbar during splash (invisible app content was still occupying layout space). Fuel Plan's Climb row starts greyed out/read-only (click to enable) since LTF doesn't typically use it. Nav Map: lesson number tag (LP45 confirmed for PPL First Solo Nav), Full Stop checkboxes per waypoint, qualifying-cross-country note, greyed-out \"Custom Route\" placeholder."},
   {v:"v0.15.0",d:"Nav Map's Flight Log rebuilt to match the LTF instructor handbook's exact format: one row per waypoint, TRK(M)/DIST computed from the route, LSALT/ALT/TAS/WIND/HDG/GS/ETA/PLAN/REV/ATA all editable — moved to full page width so 13 columns fit properly."},
   {v:"v0.14.0",d:"Fuel Plan Checker rebuilt to match the instructor handbook's actual format: Fuel Required/Margin/Endurance are now table rows (not separate stat chips); Endurance-litres is the real input (actual fuel on board) with Margin/Endurance derived from it, using the flying-phase (Sub-Total) burn rate — matches the handbook's worked example within 1 unit. Added From and Additional Fuel Components fields."},
   {v:"v0.13.0",d:"Quick Links reverted to always-expanded (Changelog + Fuel Plan example keep the collapsed-accordion style). Splash trace line: gradient fade added, cropped 4px more, both trace + aircraft lifted 4px."},
@@ -739,7 +749,7 @@ calcWB();
 // auto-convert time to litres because burn rate varies by phase (climb vs
 // cruise vs taxi) and should come from the POH, not a single assumed rate.
 const FUEL_ROWS=[
-  {k:"climb",l:"Climb"},
+  {k:"climb",l:"Climb",startDisabled:true,hint:"LTF doesn't typically use a separate climb fuel figure for this aircraft/route type — click to enter one if this flight needs it."},
   {k:"trip",l:"Trip Fuel"},
   {k:"alt",l:"Dest. Alternate"},
   {k:"cont",l:"Contingency Fuel",hint:"Exposition 2.2.1(7): only required for turbojet/large aeroplane — not LTF's piston singles/twins. Confirm with HOO if LTF still wants one entered regardless."},
@@ -750,7 +760,7 @@ const FUEL_ROWS=[
 ];
 const fpAcSel=$("#fpAc");
 fpAcSel.innerHTML=FLEET.map(f=>`<option>${f.reg}</option>`).join("");
-const fpRow=r=>`<tr><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num">${r.noMin?'<div class="fpblocked"></div>':`<input type="number" id="fp-${r.k}-m" value="0" min="0">`}</td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"></td></tr>`;
+const fpRow=r=>`<tr${r.startDisabled?' class="fp-row-disabled" data-fprow="'+r.k+'"':''}><td>${r.l}${r.hint?`<div class="fphint">${r.hint}</div>`:""}</td><td class="num">${r.noMin?'<div class="fpblocked"></div>':`<input type="number" id="fp-${r.k}-m" value="0" min="0"${r.startDisabled?' readonly':''}>`}</td><td class="num"><input type="number" id="fp-${r.k}-l" value="0" min="0" step="0.1"${r.startDisabled?' readonly':''}></td></tr>`;
 $("#fpTable").innerHTML=`<thead><tr><th></th><th class="num">Min</th><th class="num">Litres</th></tr></thead>
   <tbody>
     ${FUEL_ROWS.slice(0,3).map(fpRow).join("")}
@@ -763,6 +773,11 @@ $("#fpTable").innerHTML=`<thead><tr><th></th><th class="num">Min</th><th class="
     <tr><td>Additional Fuel Components</td><td colspan="2"><input type="text" id="fpAdditionalNote" placeholder="What does the Additional row above cover?" style="text-align:left"></td></tr>
   </tbody>`;
 document.querySelectorAll('#fpTable input, #fpAc').forEach(el=>el.addEventListener("input",calcFuelPlan));
+$("#fpTable").addEventListener("click",e=>{
+  const row=e.target.closest(".fp-row-disabled"); if(!row) return;
+  row.classList.remove("fp-row-disabled");
+  row.querySelectorAll("input").forEach(inp=>inp.readOnly=false);
+});
 fpAcSel.addEventListener("change",()=>{
   // Reset Endurance-litres to this aircraft's usable fuel by default (actual fuel on board
   // at start-up per the handbook's step 6 — instructor can reduce if not filled to tabs).
@@ -832,7 +847,7 @@ function routeDist(r){let d=0;for(let i=0;i<r.legs.length-1;i++)d+=nm(WP[r.legs[
 function renderNavList(f=""){
   const q=f.toLowerCase();
   $("#navList").innerHTML=ROUTES.filter(r=>r.label.toLowerCase().includes(q)).map(r=>
-    `<div class="navitem ${r.id===curRoute.id?'active':''}" data-id="${r.id}"><span>${r.label}</span><small>${routeDist(r).toFixed(0)}nm</small></div>`).join("");
+    `<div class="navitem ${r.id===curRoute.id?'active':''}" data-id="${r.id}"><span>${r.label}${r.lesson?` <span style="color:var(--sky);font-family:var(--font-mono);font-size:10px">${r.lesson}</span>`:""}</span><small>${routeDist(r).toFixed(0)}nm</small></div>`).join("");
   document.querySelectorAll(".navitem").forEach(el=>el.addEventListener("click",()=>{
     curRoute=ROUTES.find(r=>r.id===el.dataset.id); renderNavList($("#navSearch").value); drawMap();
   }));
@@ -861,7 +876,7 @@ function drawMap(){
   $("#map").innerHTML=`<rect width="${W}" height="${H}" fill="#0a1526"/>${grid}
     <path d="${path}" fill="none" stroke="#f47b20" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="3000" stroke-dashoffset="3000">
       <animate attributeName="stroke-dashoffset" from="3000" to="0" dur="1.4s" fill="freeze"/></path>${dots}${arrows}`;
-  $("#rName").textContent=curRoute.label;
+  $("#rName").textContent=curRoute.label+(curRoute.lesson?` (${curRoute.lesson})`:"");
   $("#rMeta").textContent=`${curRoute.legs.length-1} legs · ${tot} nm`;
 
   // Flight Log — one row per waypoint, matching the LTF instructor handbook's
@@ -877,6 +892,7 @@ function drawMap(){
     const distCell=hasLeg?nm(pts[i-1],p).toFixed(1):"";
     flRows+=`<tr>
       <td style="font-family:var(--font-mono);font-weight:700;color:var(--ink)">${p.code}${p.ap?'*':''}</td>
+      <td style="text-align:center"><input type="checkbox" id="fl-${i}-fullstop" class="fl-fullstop" ${i===0||i===pts.length-1?"checked":""}></td>
       <td><input type="text" id="fl-${i}-lsalt"></td>
       <td><input type="text" id="fl-${i}-alt"></td>
       <td><input type="text" id="fl-${i}-tas"></td>
@@ -891,8 +907,22 @@ function drawMap(){
       <td><input type="text" id="fl-${i}-ata"></td>
     </tr>`;
   });
-  $("#legTable").innerHTML=`<thead><tr><th>WP</th><th>LSALT</th><th>ALT</th><th>TAS</th><th>TRK(M)</th><th>WIND(M)</th><th>HDG(M)</th><th>GS</th><th>DIST</th><th>ETA MIN</th><th>PLAN EST</th><th>REV EST</th><th>ATA/ATD</th></tr></thead>
+  $("#legTable").innerHTML=`<thead><tr><th>WP</th><th>Full Stop</th><th>LSALT</th><th>ALT</th><th>TAS</th><th>TRK(M)</th><th>WIND(M)</th><th>HDG(M)</th><th>GS</th><th>DIST</th><th>ETA MIN</th><th>PLAN EST</th><th>REV EST</th><th>ATA/ATD</th></tr></thead>
     <tbody>${flRows}</tbody>`;
+  document.querySelectorAll(".fl-fullstop").forEach(cb=>cb.addEventListener("change",updateQualNav));
+  updateQualNav();
+}
+function updateQualNav(){
+  const fullStops=document.querySelectorAll(".fl-fullstop:checked").length;
+  const tot=Math.round(routeDist(curRoute));
+  // Qualifying cross-country nav (CASR Part 61 MOS) generally requires full-stop
+  // landings at aerodromes other than the departure point, plus a minimum total
+  // distance — exact current thresholds (which differ by licence level) aren't
+  // hardcoded here since getting a safety/certification figure wrong is worse
+  // than not showing one. Verify against the current Part 61 MOS before relying
+  // on this for logbook/licensing purposes.
+  $("#qualNavNote").innerHTML=`<b style="color:var(--ink)">${fullStops} full-stop landing${fullStops===1?'':'s'} marked</b> · ${tot} nm total this route.
+    Whether this qualifies as a cross-country navigation exercise for logbook/licensing purposes depends on current CASR Part 61 MOS distance and landing-away requirements (these vary by licence level) — verify against the current MOS, not this figure alone.`;
 }
 renderNavList();
 drawMap();
