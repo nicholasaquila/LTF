@@ -246,6 +246,13 @@
   .maint-tile.disabled-tile{opacity:.35; cursor:not-allowed; pointer-events:none}
   .maint-tile .reg{font-weight:800; font-size:14px; color:var(--ink)}
   .maint-tile .type{font-size:10.5px; color:var(--faint); margin-top:2px}
+  .wa-mention{margin-top:var(--u3); padding:var(--u3); border-left:2px solid var(--sky);
+    background:rgba(90,160,255,.06); border-radius:0 var(--r2) var(--r2) 0}
+  .wa-mention-head{font-size:11px; color:var(--sky); font-weight:700; letter-spacing:.02em; margin-bottom:2px}
+  .wa-mention-body{font-size:13px; color:var(--ink); font-style:italic}
+  .gauge-wrap{display:flex; align-items:center; gap:var(--u2); flex-wrap:nowrap}
+  .gauge-wrap svg{flex:0 0 46%; min-width:0}
+  .gauge-wrap .wa-mention{flex:1 1 54%; margin-top:0; align-self:center; min-width:0}
   .rmnode{flex:1 0 180px; max-width:212px; position:relative; padding-right:var(--u5)}
   .rmline{position:absolute; top:12px; left:28px; right:0; height:1px; background:var(--line)}
   .rmnode:last-child .rmline{display:none}
@@ -578,9 +585,14 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
           <span class="sop-label">Aircraft Maintenance Data</span>
           <span class="sop-warning"><span class="sop-prefix">[FETCH FAILED]</span> — FlightLogger integration not connected — maintenance parts/records not live.</span>
         </div>
+        <div class="sopcheck">
+          <div class="sop-spinner"></div>
+          <span class="sop-label">WhatsApp API</span>
+          <span class="sop-warning"><span class="sop-prefix">[FETCH FAILED]</span></span>
+        </div>
       </div>
 
-      <div class="plabel" style="margin-top:var(--u4)">Aircraft</div>
+      <div class="plabel" style="margin-top:var(--u4)">Aircraft Fleet Status</div>
       <div class="mainttiles" id="maintTiles"></div>
 
       <div id="maintDetail" style="display:none; margin-top:var(--u5)">
@@ -731,7 +743,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.51.0";
+const VERSION="v0.57.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -805,8 +817,7 @@ function renderMaintAcHeader(){
       <div style="font-size:20px; font-weight:800; color:var(--ink)">${a.reg}</div>
       <div class="hint" style="margin:0">${a.type} · Base ${a.base}</div>
     </div>
-    <div class="hint" style="margin-top:var(--u2)">Oil consumption ${a.oilConsumption} · TTAF* ${a.ttaf} · Tach* ${a.tach} · Hobbs* ${a.hobbs} · Other* ${a.stat1}</div>
-    <div class="hint" style="margin-top:var(--u1)">*Labels inferred from the source export's layout, not confirmed against FlightLogger's own field names — verify before relying on these specifically.</div>`;
+    <div class="hint" style="margin-top:var(--u2)">Oil consumption ${a.oilConsumption} · TTAF ${a.ttaf} · Tach ${a.tach} · Hobbs ${a.hobbs} · Other ${a.stat1}</div>`;
 }
 function fmtField(v){ return v==null?"—":v; }
 function renderMaintTable(elId, rows, includeReason){
@@ -833,10 +844,41 @@ $("#maintApprovalPanel").innerHTML=`<div class="hint">There are no maintenance p
 // project notes). Only VH-KAI has maintenance data, so it's the only tile
 // that's actually clickable; the rest are shown but disabled, matching the
 // "show them, grey them out" request rather than hiding them entirely.
+const PW=602.0, PH=422.118; // swapped after rotating the trace 90deg -- wings (its longer dimension) now run horizontal, fuselage vertical
+const PLANFORM_TRANSFORM="translate(0,422.118) rotate(-90) translate(-175.275,-19.485)"; // normalizes the trace's own coordinates to (0,0), then rotates -90deg (opposite of the first attempt, which pointed the nose down instead of up) -- path data itself is untouched, byte-for-byte from the uploaded file
+const PLANFORM_PATH="m 427.19673,620.818 c -0.36667,-0.36667 -0.66776,-5.42917 -0.66909,-11.25 -0.001,-5.82084 -0.44644,-16.43334 -0.98913,-23.58334 -0.54268,-7.15 -3.89702,-56.68175 -7.4541,-110.07057 -3.55707,-53.38881 -6.86501,-98.16381 -7.35097,-99.5 -0.48596,-1.33618 -1.9375,-7.92665 -3.22566,-14.64547 l -2.34209,-12.21605 -4.56781,-0.63526 c -2.5123,-0.34939 -8.61782,-1.49043 -13.56782,-2.53565 -4.95,-1.04521 -16.2,-3.9329 -25,-6.41707 -8.8,-2.48418 -21.16378,-5.41588 -27.47507,-6.5149 -7.95921,-1.38597 -23.73836,-2.59123 -51.5,-3.9337 -22.01371,-1.06452 -43.15661,-2.0355 -46.98422,-2.15773 l -6.9593,-0.22223 -8.5407,34.13078 c -4.69739,18.77192 -8.99071,34.55432 -9.54071,35.07199 -0.55,0.51767 -4.4411,2.35994 -8.64689,4.09394 -6.34789,2.61715 -8.72611,3.10168 -14,2.85232 l -6.35311,-0.3004 -0.21827,-7 c -0.12005,-3.85 -0.71211,-16.1768 -1.3157,-27.3929 -1.00437,-18.66358 -1.27227,-20.53449 -3.15918,-22.06242 l -2.06175,-1.6695 v -24.23747 c 0,-23.1774 0.091,-24.33438 2.08148,-26.4531 1.87869,-1.99977 2.18547,-4.16257 3.14898,-22.20011 0.58714,-10.99147 1.17033,-23.3595 1.29598,-27.4845 l 0.22846,-7.5 6,-0.28328 c 5.09313,-0.24047 7.35255,0.29349 14.94857,3.53274 l 8.94858,3.81603 8.55142,34.14388 c 4.70329,18.77914 8.80353,34.39151 9.11165,34.69415 0.30812,0.30264 19.43312,-0.33101 42.5,-1.4081 23.06688,-1.0771 44.86478,-2.22704 48.43978,-2.55543 3.575,-0.32838 10.55,-1.25936 15.5,-2.06885 4.95,-0.80948 17.55,-3.87233 28,-6.80634 10.45,-2.934 21.7,-5.84024 25,-6.45832 3.3,-0.61807 8.25,-1.46734 11,-1.88726 l 5,-0.7635 3.22782,-14.97786 c 2.92297,-13.56335 3.56153,-19.88873 6.76146,-66.97786 1.94351,-28.6 5.3285,-78.36515 7.52219,-110.58922 2.19369,-32.22407 3.98853,-63.16157 3.98853,-68.75 V 19.48466 h 8.39986 8.39985 l 15.35015,7.03607 c 8.44258,3.86984 15.97387,7.65963 16.73619,8.42176 1.14192,1.14163 1.71039,20.90633 3.22748,112.21394 l 1.84143,110.82823 3.13063,15 c 1.72185,8.25 3.46693,15.36246 3.87797,15.80546 0.41104,0.44299 5.87489,1.20551 12.1419,1.69447 6.267,0.48896 20.61954,1.84536 31.89454,3.01423 11.275,1.16886 25.33192,2.96384 31.23759,3.98884 5.90567,1.02499 11.15101,2.11914 11.65632,2.43143 0.5053,0.3123 1.23494,2.86698 1.62143,5.67707 l 0.7027,5.10926 3.89098,-0.6222 c 2.30673,-0.36886 3.89098,-0.22154 3.89098,0.36183 0,0.54121 2.21792,1.93814 4.9287,3.10429 2.71078,1.16614 5.67195,2.94154 6.58036,3.94533 0.90841,1.00379 1.503,2.85921 1.3213,4.12317 -0.18169,1.26395 -1.83298,3.30826 -3.66952,4.54289 -1.97476,1.32756 -5.70436,2.51239 -9.12757,2.89968 -3.18362,0.36019 -6.26579,0.94993 -6.84926,1.31053 -0.58348,0.36061 -1.43225,2.87087 -1.88616,5.57836 l -0.8253,4.9227 -6.98627,1.31629 c -3.84245,0.72397 -11.26128,1.95474 -16.48628,2.73504 -5.225,0.78031 -20.075,2.3472 -33,3.48198 -12.925,1.13479 -25.28732,2.17937 -27.47183,2.3213 l -3.97183,0.25805 -3.18702,14.59348 -3.18702,14.59348 -1.94891,111.73651 c -1.86428,106.88407 -2.03109,111.81734 -3.84115,113.59769 -1.04073,1.02365 -8.76028,5.03766 -17.15455,8.92002 -14.51349,6.71249 -15.62152,7.05882 -22.58334,7.05882 -4.02655,0 -7.62101,-0.3 -7.98768,-0.66666 z";
 const MAINT_KNOWN_AIRCRAFT=[...FLEET.map(f=>({reg:f.reg,type:"DA40"})), {reg:"VH-KAI",type:"DA40 IFR [LRT]"}];
+const MAINT_100HR_DUE=8453.3, MAINT_50HR_DUE=8403.3, MAINT_CURRENT_HRS=8399.8, MAINT_TOL=5;
+const cycleStart=MAINT_100HR_DUE-100;
+const remaining=MAINT_100HR_DUE-MAINT_CURRENT_HRS;
+const remainingPct=Math.max(0,Math.min(100,remaining));
+const fillColor=remaining>50?"var(--green)":"var(--amber)";
+const fiftyMarkPct=(MAINT_50HR_DUE-cycleStart); // where the 50hr checkpoint sits within the 0-100 cycle
+const tolPct=MAINT_TOL; // +/- band width in the same 0-100 units (1 unit = 1 hour)
+let _tileClipN=0;
+function tilePlanformSVG(active){
+  // Mini version of the 100-hour gauge planform. For the aircraft we have data
+  // for, it shows the same bottom-up status fill as the large gauge (green/amber
+  // to the remaining-hours level, clipped to the silhouette) so the tile carries
+  // the same at-a-glance status. For aircraft with no data, just a faint grey
+  // silhouette (and the tile itself stays greyed-out / disabled).
+  if(!active){
+    return `<svg viewBox="0 0 ${PW} ${PH}" style="width:100%; height:38px; display:block; margin:0 auto var(--u2)">
+      <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="rgba(255,255,255,.14)"/>
+    </svg>`;
+  }
+  const cid="tileClip"+(_tileClipN++); // unique clip id per tile so multiple can coexist
+  const fillTopY=PH*(1-remainingPct/100);
+  return `<svg viewBox="0 0 ${PW} ${PH}" style="width:100%; height:38px; display:block; margin:0 auto var(--u2)">
+    <defs><clipPath id="${cid}"><path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}"/></clipPath></defs>
+    <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="rgba(255,255,255,.10)"/>
+    <rect clip-path="url(#${cid})" x="0" y="${fillTopY.toFixed(1)}" width="${PW}" height="${(PH-fillTopY).toFixed(1)}" fill="${fillColor}" opacity=".9"/>
+  </svg>`;
+}
 $("#maintTiles").innerHTML=MAINT_KNOWN_AIRCRAFT.map(a=>{
   const has=a.reg===MAINT_AIRCRAFT.reg;
   return `<div class="maint-tile${has?'':' disabled-tile'}" data-reg="${a.reg}">
+    ${tilePlanformSVG(has)}
     <div class="reg">${a.reg}</div>
     <div class="type">${has?a.type:'No maintenance data'}</div>
   </div>`;
@@ -854,16 +896,6 @@ $("#maintTiles").addEventListener("click",e=>{
 // the 50hr check is a genuine interim point within the same 100hr cycle,
 // not a separate/unrelated one), current tach 8399.8 is the same
 // (flagged-as-inferred) figure already shown in the header above.
-const MAINT_100HR_DUE=8453.3, MAINT_50HR_DUE=8403.3, MAINT_CURRENT_HRS=8399.8, MAINT_TOL=5;
-const cycleStart=MAINT_100HR_DUE-100;
-const remaining=MAINT_100HR_DUE-MAINT_CURRENT_HRS;
-const remainingPct=Math.max(0,Math.min(100,remaining));
-const fillColor=remaining>50?"var(--green)":"var(--amber)";
-const fiftyMarkPct=(MAINT_50HR_DUE-cycleStart); // where the 50hr checkpoint sits within the 0-100 cycle
-const tolPct=MAINT_TOL; // +/- band width in the same 0-100 units (1 unit = 1 hour)
-const PW=602.0, PH=422.118; // swapped after rotating the trace 90deg -- wings (its longer dimension) now run horizontal, fuselage vertical
-const PLANFORM_TRANSFORM="translate(0,422.118) rotate(-90) translate(-175.275,-19.485)"; // normalizes the trace's own coordinates to (0,0), then rotates -90deg (opposite of the first attempt, which pointed the nose down instead of up) -- path data itself is untouched, byte-for-byte from the uploaded file
-const PLANFORM_PATH="m 427.19673,620.818 c -0.36667,-0.36667 -0.66776,-5.42917 -0.66909,-11.25 -0.001,-5.82084 -0.44644,-16.43334 -0.98913,-23.58334 -0.54268,-7.15 -3.89702,-56.68175 -7.4541,-110.07057 -3.55707,-53.38881 -6.86501,-98.16381 -7.35097,-99.5 -0.48596,-1.33618 -1.9375,-7.92665 -3.22566,-14.64547 l -2.34209,-12.21605 -4.56781,-0.63526 c -2.5123,-0.34939 -8.61782,-1.49043 -13.56782,-2.53565 -4.95,-1.04521 -16.2,-3.9329 -25,-6.41707 -8.8,-2.48418 -21.16378,-5.41588 -27.47507,-6.5149 -7.95921,-1.38597 -23.73836,-2.59123 -51.5,-3.9337 -22.01371,-1.06452 -43.15661,-2.0355 -46.98422,-2.15773 l -6.9593,-0.22223 -8.5407,34.13078 c -4.69739,18.77192 -8.99071,34.55432 -9.54071,35.07199 -0.55,0.51767 -4.4411,2.35994 -8.64689,4.09394 -6.34789,2.61715 -8.72611,3.10168 -14,2.85232 l -6.35311,-0.3004 -0.21827,-7 c -0.12005,-3.85 -0.71211,-16.1768 -1.3157,-27.3929 -1.00437,-18.66358 -1.27227,-20.53449 -3.15918,-22.06242 l -2.06175,-1.6695 v -24.23747 c 0,-23.1774 0.091,-24.33438 2.08148,-26.4531 1.87869,-1.99977 2.18547,-4.16257 3.14898,-22.20011 0.58714,-10.99147 1.17033,-23.3595 1.29598,-27.4845 l 0.22846,-7.5 6,-0.28328 c 5.09313,-0.24047 7.35255,0.29349 14.94857,3.53274 l 8.94858,3.81603 8.55142,34.14388 c 4.70329,18.77914 8.80353,34.39151 9.11165,34.69415 0.30812,0.30264 19.43312,-0.33101 42.5,-1.4081 23.06688,-1.0771 44.86478,-2.22704 48.43978,-2.55543 3.575,-0.32838 10.55,-1.25936 15.5,-2.06885 4.95,-0.80948 17.55,-3.87233 28,-6.80634 10.45,-2.934 21.7,-5.84024 25,-6.45832 3.3,-0.61807 8.25,-1.46734 11,-1.88726 l 5,-0.7635 3.22782,-14.97786 c 2.92297,-13.56335 3.56153,-19.88873 6.76146,-66.97786 1.94351,-28.6 5.3285,-78.36515 7.52219,-110.58922 2.19369,-32.22407 3.98853,-63.16157 3.98853,-68.75 V 19.48466 h 8.39986 8.39985 l 15.35015,7.03607 c 8.44258,3.86984 15.97387,7.65963 16.73619,8.42176 1.14192,1.14163 1.71039,20.90633 3.22748,112.21394 l 1.84143,110.82823 3.13063,15 c 1.72185,8.25 3.46693,15.36246 3.87797,15.80546 0.41104,0.44299 5.87489,1.20551 12.1419,1.69447 6.267,0.48896 20.61954,1.84536 31.89454,3.01423 11.275,1.16886 25.33192,2.96384 31.23759,3.98884 5.90567,1.02499 11.15101,2.11914 11.65632,2.43143 0.5053,0.3123 1.23494,2.86698 1.62143,5.67707 l 0.7027,5.10926 3.89098,-0.6222 c 2.30673,-0.36886 3.89098,-0.22154 3.89098,0.36183 0,0.54121 2.21792,1.93814 4.9287,3.10429 2.71078,1.16614 5.67195,2.94154 6.58036,3.94533 0.90841,1.00379 1.503,2.85921 1.3213,4.12317 -0.18169,1.26395 -1.83298,3.30826 -3.66952,4.54289 -1.97476,1.32756 -5.70436,2.51239 -9.12757,2.89968 -3.18362,0.36019 -6.26579,0.94993 -6.84926,1.31053 -0.58348,0.36061 -1.43225,2.87087 -1.88616,5.57836 l -0.8253,4.9227 -6.98627,1.31629 c -3.84245,0.72397 -11.26128,1.95474 -16.48628,2.73504 -5.225,0.78031 -20.075,2.3472 -33,3.48198 -12.925,1.13479 -25.28732,2.17937 -27.47183,2.3213 l -3.97183,0.25805 -3.18702,14.59348 -3.18702,14.59348 -1.94891,111.73651 c -1.86428,106.88407 -2.03109,111.81734 -3.84115,113.59769 -1.04073,1.02365 -8.76028,5.03766 -17.15455,8.92002 -14.51349,6.71249 -15.62152,7.05882 -22.58334,7.05882 -4.02655,0 -7.62101,-0.3 -7.98768,-0.66666 z";
 // Higher-detail pass on the planform (10 Jul 2026, user asked for less "low poly").
 // Honest note on method: I tried to trace this directly from the uploaded POH photo's
 // pixels a second time, at much higher density, but the three 3-view drawings on that
@@ -886,7 +918,8 @@ function renderMaintGauge(){
   const tolTopY=PH*(1-(fiftyMarkPct+tolPct)/100), tolBotY=PH*(1-(fiftyMarkPct-tolPct)/100);
   $("#maintGaugePanel").innerHTML=`
     <div class="plabel">100-Hour Cycle</div>
-    <svg viewBox="0 0 ${PW} ${PH}" style="width:100%; max-width:340px; height:auto; display:block; margin:0 auto">
+    <div class="gauge-wrap">
+    <svg viewBox="0 0 ${PW} ${PH}" style="height:auto; display:block">
       <defs><clipPath id="planformClip"><path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}"/></clipPath></defs>
       <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="rgba(255,255,255,.06)" stroke="var(--line2)" stroke-width="1.5"/>
       <!-- Planform is now a single clean subpath (the outer silhouette only) isolated
@@ -902,7 +935,23 @@ function renderMaintGauge(){
       </g>
       <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="none" stroke="var(--line2)" stroke-width="1.5"/>
       <line x1="0" y1="${markY.toFixed(1)}" x2="${PW}" y2="${markY.toFixed(1)}" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="5,4"/>
+      <!-- WhatsApp maintenance-mention callout. Anchor is the COCKPIT/CABIN
+           (~451,91 in this rotated viewBox — fuselage centreline, forward of the
+           wing; position the user marked directly on a screenshot). Deliberate:
+           this squawk ("stick aft feels restricted") is a symptom reported from the
+           cockpit, not a located defect — the cause could be anywhere in the pitch
+           control run (linkage, bellcrank, elevator, an obstruction), so pointing
+           the leader at the elevator would wrongly imply we know the source. Vague/
+           symptom messages anchor at the cockpit; only unambiguous, located ones
+           ("tail strike", "left strobe inop") should point at the actual part. Dotted. -->
+      <line x1="451" y1="91" x2="602" y2="235" stroke="var(--sky)" stroke-width="1.5" stroke-dasharray="2,5" stroke-linecap="round"/>
+      <circle cx="451" cy="91" r="7" fill="var(--sky)"/>
     </svg>
+    <div class="wa-mention">
+      <div class="wa-mention-head">WhatsApp maintenance mention · 10/07/2026</div>
+      <div class="wa-mention-body">"KAI stick aft feels restricted compared to normal, anyone else experience this?"</div>
+    </div>
+    </div>
     <div class="hint" style="margin-top:var(--u2)"><b style="color:${fillColor}">${remaining.toFixed(1)} hrs</b> until next 100-hour / annual (due at ${MAINT_100HR_DUE}).</div>
     <div class="hint" style="margin-top:var(--u1)">Dashed line: 50-hour interim check (±${MAINT_TOL}hrs), due at ${MAINT_50HR_DUE} — current hours already sit inside that tolerance band.</div>`;
 }
@@ -1018,6 +1067,7 @@ const INTEGRITY_CHECKS=[
   {label:"Airspace Boundaries (CTA/PRD)", ok:true, warn:"Map overlay reflects current CTA/PRD boundaries."},
   {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", ok:true, warn:"Qualifying-flight thresholds synced to current MOS."},
   {label:"Live Weather (TAFs / AWIS)", warn:"Live weather integration not connected — current TAFs/AWIS not available."},
+  {label:"WhatsApp API"},
 ];
 const SPIN_DUR=1.8;
 $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
@@ -1026,7 +1076,7 @@ $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
   return `<div class="sopcheck">
     <div class="sop-spinner${c.ok?' ok':''}" style="animation-delay:${spinDelay}s"></div>
     <span class="sop-label">${c.label}</span>
-    <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s"><span class="sop-prefix">${prefix}</span> — ${c.warn}</span>
+    <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s"><span class="sop-prefix">${prefix}</span>${c.warn?` — ${c.warn}`:''}</span>
   </div>`;
 }).join("");
 // Once the full sequence has naturally played through once, lock every
@@ -1054,6 +1104,12 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.57.0",d:"Fine-tuned the WhatsApp callout anchor to the exact cockpit/cabin spot the user marked on a screenshot (~forward fuselage, just ahead of the wing) — still the cockpit per the vague-symptom principle, just positioned more precisely where a cabin/cockpit-reported squawk reads best. Line still dotted and connecting to the side box."},
+  {v:"v0.56.0",d:"Removed the inferred-labels disclaimer under the VH-KAI header stats (and the asterisks it explained). Moved the WhatsApp maintenance-mention callout leader back to the cockpit: a vague symptom report like \"stick aft feels restricted\" shouldn't presume where the fault is — the cause could be anywhere in the pitch control run, so pointing at the elevator would wrongly imply a known source. Principle now baked in: vague/symptom mentions anchor at the cockpit (where it's reported from); only unambiguous, located ones (e.g. \"tail strike\", \"left strobe inop\") should point at the actual part."},
+  {v:"v0.55.0",d:"Reworked the WhatsApp maintenance-mention callout on the VH-KAI diagram: the mention now sits in its own box off to the side of the diagram (side-by-side layout that holds even on a narrow phone), the leader line is now dotted (was dashed), and it anchors on the elevator/horizontal-stabiliser — the control surface aft stick actually moves — rather than the cockpit, so the line genuinely runs between the box and the specific point the 'stick aft feels restricted' squawk concerns. Verified the line connects the anchor to the box's edge at both mobile and desktop widths."},
+  {v:"v0.54.0",d:"Added a WhatsApp API integrity checker (fetch failed, no extra detail) to both the Home Live Data Integrity section and the top of the Maintenance page. On the full VH-KAI diagram, added a dashed callout leader from the cockpit out to a notice reproducing a WhatsApp maintenance mention — \"KAI stick aft feels restricted compared to normal, anyone else experience this?\" (10/07/2026) — as an example of how an informal squawk from the group chat could surface against the aircraft. Tile mini-diagrams are unaffected (callout is only on the full diagram)."},
+  {v:"v0.53.0",d:"Maintenance tab: the aircraft tile diagrams now carry the same status fill as the large 100-hour gauge — VH-KAI's tile shows the green/amber fill up to its remaining-hours level (clipped to the mini silhouette, bottom-up like the big gauge), so the tile conveys the same at-a-glance maintenance status. Aircraft with no data keep the plain faint-grey silhouette and stay disabled. Each mini-gauge uses a unique clip-path id so multiple can render together; moved the maintenance-figure constants earlier in the script (same load-order care as last round) so the tile renderer can read them."},
+  {v:"v0.52.0",d:"Maintenance tab: renamed the 'Aircraft' section header to 'Aircraft Fleet Status', and each aircraft selector tile now shows a small version of the DA40 planform diagram — solid sky-blue for VH-KAI (the aircraft we have data for, clickable) and a faint grey silhouette for the rest (no maintenance data, tile stays greyed out and disabled). Reused the same clean silhouette path/transform from the 100-hour gauge; moved those three planform constants earlier in the script so they're defined before the tile render uses them."},
   {v:"v0.51.0",d:"DA40 planform: resolved the wing clutter properly at the source. The right wing looked skeletonised because the autotrace path had 42 subpaths — one clean outer silhouette (subpath 0) plus 41 internal panel/rib detail lines from the original technical drawing. Isolated subpath 0 (the complete closed outline — both wings and tail solid, verified) and dropped the rest, so the shape is now a single clean silhouette with no internal lines. This also made the previous two rounds' wing and tail gap-patches redundant (the clean subpath fills correctly on its own), so they were removed — which additionally fixed a subtle side effect where the wing patch had been double-filling the right wing and making it render slightly brighter than the left. Both wings now render at identical brightness (verified pixel-equal), gauge fill and status-coloured hours text unchanged."},
   {v:"v0.50.0",d:"DA40 planform: fixed the right wing rendering hollow/skeletonised — this was the real issue behind the earlier 'skeletonised' reports (the tail gap fixed last version was a separate, smaller problem). The right wing's subpaths have a winding direction that cancels the fill under both nonzero and evenodd rules, so it painted as outline-only despite the path technically enclosing the area (confirmed by boosting the fill to solid red and seeing the right wing stay empty while the left filled). Fixed by tracing the wing's true outline bounds (via pixel-sampling a solid render, per-column) and patching that exact polygon over the gap, added to both the silhouette and the gauge clip-path so it's consistent. Also: the '__ hrs until next 100-hour' figure now colours itself to match the gauge status (green when >50hrs remaining, amber at/below), instead of a fixed neutral colour — so it currently shows green."},
   {v:"v0.49.0",d:"DA40 planform: fixed a real gap in the tail boom that made it look hollow/skeletonised — the source autotrace had segmented the boom's two edges as separate parallel lines rather than one closed shape, leaving a genuine unfilled strip between them (confirmed directly by rendering the region at high zoom, not assumed from a fill-rule guess — tried nonzero vs evenodd first, neither changed it, since the enclosed area itself was missing from the path data). Patched with a small rect matched to the trace's own coordinates, added to both the base silhouette and the clip-path used for the coloured gauge fill, so the patch benefits both layers consistently. Checked the wing (the other area flagged) at the same zoom level and found it solid — no equivalent fix needed there."},
