@@ -751,7 +751,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.60.0";
+const VERSION="v0.61.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -854,19 +854,21 @@ $("#maintApprovalPanel").innerHTML=`<div class="hint">There are no maintenance p
 // "show them, grey them out" request rather than hiding them entirely.
 const PW=602.0, PH=422.118; // swapped after rotating the trace 90deg -- wings (its longer dimension) now run horizontal, fuselage vertical
 const PLANFORM_TRANSFORM="translate(0,422.118) rotate(-90) translate(-175.275,-19.485)"; // normalizes the trace's own coordinates to (0,0), then rotates -90deg (opposite of the first attempt, which pointed the nose down instead of up) -- path data itself is untouched, byte-for-byte from the uploaded file
-// Named anchor points on the planform, in gauge viewBox coords (viewBox 0 0 602 422.118).
-// Derived directly from a screenshot the user annotated: red=cockpit, blue=propeller,
-// white=wingtips, purple=tail. These are the VISUAL reference points (the fuselage as a
-// viewer sees it sits on the wingspan centreline ~x385, even though the traced fill is
-// slightly right of that). Use these to anchor maintenance-warning leaders to the right
-// part: a located squawk points at its part (e.g. left_strobe -> a wingtip); a vague
-// symptom ("stick feels…") points at the cockpit.
+// Named anchor points on the planform, in gauge viewBox coords (viewBox x 0..602).
+// Derived from a screenshot the user annotated (red=cockpit, blue=propeller,
+// white=wingtips, purple=tail), then corrected against the live render: the
+// fuselage centreline sits at the viewBox horizontal centre (x=301), NOT at 385 —
+// an earlier screen->viewBox mapping used wrong wingtip references and pushed the
+// cockpit dot out onto the right wing root. Verified by measuring the rendered
+// plane's centre directly (x≈300). Cockpit/propeller/tail are on the centreline;
+// wingtips sit symmetric about it. Use these to anchor maintenance-warning leaders:
+// a located squawk points at its part, a vague symptom points at the cockpit.
 const AC_ANCHORS={
-  propeller:    {x:385, y:20},
-  cockpit:      {x:385, y:124},
-  leftWingtip:  {x:176, y:162},
-  rightWingtip: {x:596, y:168},
-  tail:         {x:384, y:422},
+  propeller:    {x:301, y:20},
+  cockpit:      {x:301, y:124},
+  leftWingtip:  {x:8,   y:150},
+  rightWingtip: {x:594, y:150},
+  tail:         {x:301, y:422},
 };
 const PLANFORM_PATH="m 427.19673,620.818 c -0.36667,-0.36667 -0.66776,-5.42917 -0.66909,-11.25 -0.001,-5.82084 -0.44644,-16.43334 -0.98913,-23.58334 -0.54268,-7.15 -3.89702,-56.68175 -7.4541,-110.07057 -3.55707,-53.38881 -6.86501,-98.16381 -7.35097,-99.5 -0.48596,-1.33618 -1.9375,-7.92665 -3.22566,-14.64547 l -2.34209,-12.21605 -4.56781,-0.63526 c -2.5123,-0.34939 -8.61782,-1.49043 -13.56782,-2.53565 -4.95,-1.04521 -16.2,-3.9329 -25,-6.41707 -8.8,-2.48418 -21.16378,-5.41588 -27.47507,-6.5149 -7.95921,-1.38597 -23.73836,-2.59123 -51.5,-3.9337 -22.01371,-1.06452 -43.15661,-2.0355 -46.98422,-2.15773 l -6.9593,-0.22223 -8.5407,34.13078 c -4.69739,18.77192 -8.99071,34.55432 -9.54071,35.07199 -0.55,0.51767 -4.4411,2.35994 -8.64689,4.09394 -6.34789,2.61715 -8.72611,3.10168 -14,2.85232 l -6.35311,-0.3004 -0.21827,-7 c -0.12005,-3.85 -0.71211,-16.1768 -1.3157,-27.3929 -1.00437,-18.66358 -1.27227,-20.53449 -3.15918,-22.06242 l -2.06175,-1.6695 v -24.23747 c 0,-23.1774 0.091,-24.33438 2.08148,-26.4531 1.87869,-1.99977 2.18547,-4.16257 3.14898,-22.20011 0.58714,-10.99147 1.17033,-23.3595 1.29598,-27.4845 l 0.22846,-7.5 6,-0.28328 c 5.09313,-0.24047 7.35255,0.29349 14.94857,3.53274 l 8.94858,3.81603 8.55142,34.14388 c 4.70329,18.77914 8.80353,34.39151 9.11165,34.69415 0.30812,0.30264 19.43312,-0.33101 42.5,-1.4081 23.06688,-1.0771 44.86478,-2.22704 48.43978,-2.55543 3.575,-0.32838 10.55,-1.25936 15.5,-2.06885 4.95,-0.80948 17.55,-3.87233 28,-6.80634 10.45,-2.934 21.7,-5.84024 25,-6.45832 3.3,-0.61807 8.25,-1.46734 11,-1.88726 l 5,-0.7635 3.22782,-14.97786 c 2.92297,-13.56335 3.56153,-19.88873 6.76146,-66.97786 1.94351,-28.6 5.3285,-78.36515 7.52219,-110.58922 2.19369,-32.22407 3.98853,-63.16157 3.98853,-68.75 V 19.48466 h 8.39986 8.39985 l 15.35015,7.03607 c 8.44258,3.86984 15.97387,7.65963 16.73619,8.42176 1.14192,1.14163 1.71039,20.90633 3.22748,112.21394 l 1.84143,110.82823 3.13063,15 c 1.72185,8.25 3.46693,15.36246 3.87797,15.80546 0.41104,0.44299 5.87489,1.20551 12.1419,1.69447 6.267,0.48896 20.61954,1.84536 31.89454,3.01423 11.275,1.16886 25.33192,2.96384 31.23759,3.98884 5.90567,1.02499 11.15101,2.11914 11.65632,2.43143 0.5053,0.3123 1.23494,2.86698 1.62143,5.67707 l 0.7027,5.10926 3.89098,-0.6222 c 2.30673,-0.36886 3.89098,-0.22154 3.89098,0.36183 0,0.54121 2.21792,1.93814 4.9287,3.10429 2.71078,1.16614 5.67195,2.94154 6.58036,3.94533 0.90841,1.00379 1.503,2.85921 1.3213,4.12317 -0.18169,1.26395 -1.83298,3.30826 -3.66952,4.54289 -1.97476,1.32756 -5.70436,2.51239 -9.12757,2.89968 -3.18362,0.36019 -6.26579,0.94993 -6.84926,1.31053 -0.58348,0.36061 -1.43225,2.87087 -1.88616,5.57836 l -0.8253,4.9227 -6.98627,1.31629 c -3.84245,0.72397 -11.26128,1.95474 -16.48628,2.73504 -5.225,0.78031 -20.075,2.3472 -33,3.48198 -12.925,1.13479 -25.28732,2.17937 -27.47183,2.3213 l -3.97183,0.25805 -3.18702,14.59348 -3.18702,14.59348 -1.94891,111.73651 c -1.86428,106.88407 -2.03109,111.81734 -3.84115,113.59769 -1.04073,1.02365 -8.76028,5.03766 -17.15455,8.92002 -14.51349,6.71249 -15.62152,7.05882 -22.58334,7.05882 -4.02655,0 -7.62101,-0.3 -7.98768,-0.66666 z";
 const MAINT_KNOWN_AIRCRAFT=[...FLEET.map(f=>({reg:f.reg,type:"DA40"})), {reg:"VH-KAI",type:"DA40 IFR [LRT]"}];
@@ -1128,6 +1130,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.61.0",d:"Fixed the cockpit anchor that kept landing on the right wing root: corrected AC_ANCHORS to the true fuselage centreline at viewBox x=301 (the viewBox centre), not the x=385 an earlier screen-to-viewBox mapping had produced from wrong wingtip references. Measured the rendered plane's actual bounds directly this time (centre x≈301, wingtips at the viewBox edges) rather than mapping from a screenshot. The WhatsApp cockpit dot now sits dead-centre on the fuselage; wingtip/propeller/tail anchors corrected to match too."},
   {v:"v0.60.0",d:"Added a named anchor map (AC_ANCHORS) for the aircraft diagram — cockpit, propeller, both wingtips, and tail, in gauge viewBox coords — derived directly from a screenshot the user annotated with the real location of each. These give maintenance-warning leaders a reliable set of reference points to draw to (a located squawk points at its part; a vague symptom points at the cockpit). Repointed the WhatsApp callout to the user-marked cockpit position, which sits on the plane's visual centreline (the traced fill is slightly right of that, which is why earlier anchors looked wing-ward)."},
   {v:"v0.59.0",d:"Repositioned the WhatsApp callout: anchor moved left onto the canopy/forward fuselage (it had appeared wing-ward because the traced fuselage sits right-of-wingspan-centre), and the mention box moved to its own box up-and-right of the diagram (inside the gauge panel, in extended header space above the plane so it doesn't overlap). The dotted train-track leader runs from the canopy straight up then right along the box's bottom edge. Verified the anchor sits on the fuselage silhouette and the box clears the plane at both mobile and desktop widths."},
   {v:"v0.58.0",d:"Maintenance page tidy-up: the three integrity checkers (Aircraft Maintenance Status, Aircraft Maintenance Data, WhatsApp API) now stack neatly in their own column below the title instead of wrapping messily across the width beside it. The WhatsApp maintenance mention moved from beside the aircraft diagram to its own box directly below it, and the dotted leader is now an orthogonal 'train-track' route — out from the cockpit to the right edge, down the side, and along the bottom into the box — right angles only, instead of a single diagonal."},
