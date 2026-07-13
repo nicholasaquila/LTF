@@ -134,8 +134,10 @@
      the warning text fades in at the same moment — reads as "checked, and
      the result is: not connected yet," not a generic infinite loading spinner. */
   .sopcheck{display:flex; align-items:center; gap:var(--u2); font-size:11.5px}
-  .maint-checks{display:flex; flex-direction:column; gap:var(--u2); margin-bottom:var(--u4)}
-  .maint-checks .sopcheck{flex-wrap:wrap}
+  .maint-checks{display:grid; grid-template-columns:auto max-content 1fr; gap:var(--u2) var(--u3);
+    align-items:center; margin-bottom:var(--u4)}
+  .maint-checks .sopcheck{display:contents}
+  .maint-checks .sopcheck .sop-warning{white-space:normal}
   .sop-spinner{width:14px; height:14px; border-radius:50%; flex:0 0 auto;
     border:2px solid rgba(255,255,255,.15); border-top-color:#fff;
     animation:sopSpin 1.8s cubic-bezier(.4,0,.2,1) forwards; animation-play-state:paused}
@@ -569,7 +571,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
             </div>
             <div class="panel" style="margin-top:var(--u4)">
               <div class="plabel">Flight Log</div>
-              <div class="hint" style="margin-bottom:var(--u3)">TRK(M) and DIST are computed from the route; everything else is yours to plan and fill in — same as the paper flight log. Departure and final arrival are checked as full-stop by default — tick/untick any waypoint to mark an actual full-stop landing (vs. touch-and-go / overfly).</div>
+              <div class="hint" style="margin-bottom:var(--u3)">TRK(M) and DIST are computed from the route; everything else is yours to plan and fill in — same as the paper flight log. The departure aerodrome isn't marked full-stop (you're taking off from it, not landing); the final arrival and any syllabus full-stop waypoints are checked by default — tick/untick any waypoint to mark an actual full-stop landing (vs. touch-and-go / overfly).</div>
               <div style="overflow-x:auto"><table id="legTable" class="fltable"></table></div>
               <div class="hint" id="qualNavNote" style="margin-top:var(--u3)"></div>
             </div>
@@ -751,7 +753,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.61.0";
+const VERSION="v0.62.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -1130,6 +1132,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.62.0",d:"Two fixes. (1) Flight planning: the departure aerodrome (first row) is no longer marked as a full-stop landing by default — you take off from it, you don't land there. This also fixes a miscount on round-trip routes (YMMB→…→YMMB), where matching full-stops by code was ticking the departure YMMB as well as the arrival; the departure row is now always excluded, so the qualifying-flight full-stop count reflects actual landings. (2) Data integrity checkers: the Maintenance page's three checkers now use an aligned grid so the labels and the [FETCH FAILED] markers line up in columns down the page (matching how the Home page checkers were already aligned)."},
   {v:"v0.61.0",d:"Fixed the cockpit anchor that kept landing on the right wing root: corrected AC_ANCHORS to the true fuselage centreline at viewBox x=301 (the viewBox centre), not the x=385 an earlier screen-to-viewBox mapping had produced from wrong wingtip references. Measured the rendered plane's actual bounds directly this time (centre x≈301, wingtips at the viewBox edges) rather than mapping from a screenshot. The WhatsApp cockpit dot now sits dead-centre on the fuselage; wingtip/propeller/tail anchors corrected to match too."},
   {v:"v0.60.0",d:"Added a named anchor map (AC_ANCHORS) for the aircraft diagram — cockpit, propeller, both wingtips, and tail, in gauge viewBox coords — derived directly from a screenshot the user annotated with the real location of each. These give maintenance-warning leaders a reliable set of reference points to draw to (a located squawk points at its part; a vague symptom points at the cockpit). Repointed the WhatsApp callout to the user-marked cockpit position, which sits on the plane's visual centreline (the traced fill is slightly right of that, which is why earlier anchors looked wing-ward)."},
   {v:"v0.59.0",d:"Repositioned the WhatsApp callout: anchor moved left onto the canopy/forward fuselage (it had appeared wing-ward because the traced fuselage sits right-of-wingspan-centre), and the mention box moved to its own box up-and-right of the diagram (inside the gauge panel, in extended header space above the plane so it doesn't overlap). The dotted train-track leader runs from the canopy straight up then right along the box's bottom edge. Verified the anchor sits on the fuselage silhouette and the box clears the plane at both mobile and desktop widths."},
@@ -1596,7 +1599,7 @@ function drawMap(){
     const tasDefault=(hasLeg&&curRoute.ac==="DA40")?"N0120":"";
     flRows+=`<tr>
       <td style="font-family:var(--font-mono);font-weight:700;color:var(--ink)">${p.code}${p.ap?'*':''}</td>
-      <td style="text-align:center"><input type="checkbox" id="fl-${i}-fullstop" class="fl-fullstop" ${i===0||(curRoute.fullStops?curRoute.fullStops.includes(p.code):i===pts.length-1)?"checked":""}></td>
+      <td style="text-align:center"><input type="checkbox" id="fl-${i}-fullstop" class="fl-fullstop" ${(i!==0&&(curRoute.fullStops?curRoute.fullStops.includes(p.code):i===pts.length-1))?"checked":""}></td>
       <td><input type="text" id="fl-${i}-lsalt"></td>
       <td><input type="text" id="fl-${i}-alt"></td>
       <td><input type="text" id="fl-${i}-tas" value="${tasDefault}"></td>
