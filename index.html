@@ -325,6 +325,77 @@
     .twocol{grid-template-columns:1fr}
     nav.tabs button{padding:0 var(--u3)}
   }
+
+  /* ---- YMMB (Your Morning Management Brief) — scoped tokens, deliberately
+     namespaced with ymmb- prefixes on both classes and custom properties so
+     nothing here can collide with the app's shared --line/--amber/--font-mono
+     tokens used everywhere else. Distinct dawn/amber identity, on purpose —
+     this page is a small personal ritual, not another operational surface,
+     and it reads that way at a glance. ---- */
+  .ymmb-view{
+    --ymmb-dawn-panel:#1a2542; --ymmb-horizon-amber:#f2a340; --ymmb-horizon-amber-dim:rgba(242,163,64,.16);
+    --ymmb-mist:#edf1fa; --ymmb-tarmac:#8792ac; --ymmb-tarmac-dim:#5c6584;
+    --ymmb-taxiway-green:#4fae7b; --ymmb-line:rgba(237,241,250,.10); --ymmb-line2:rgba(237,241,250,.06);
+    --ymmb-mono:ui-monospace,'SF Mono','Cascadia Code','Consolas','Roboto Mono',monospace;
+    max-width:760px; margin:0 auto; color:var(--ymmb-mist);
+  }
+  .ymmb-eyebrow{font-family:var(--ymmb-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ymmb-tarmac); display:flex; align-items:center; gap:10px}
+  .ymmb-dot{width:6px; height:6px; border-radius:50%; background:var(--ymmb-taxiway-green);
+    box-shadow:0 0 8px var(--ymmb-taxiway-green)}
+  .ymmb-hero{font-size:clamp(22px,5.5vw,36px); font-weight:800; letter-spacing:-.01em;
+    color:var(--ymmb-mist); margin-top:14px; line-height:1.15}
+  .ymmb-word{display:inline-block; vertical-align:bottom}
+  .ymmb-word .keep{display:inline-block; vertical-align:bottom;
+    transition:color .4s ease .15s, letter-spacing .4s ease .15s}
+  .ymmb-word .rest{display:inline-block; vertical-align:bottom; overflow:hidden; white-space:nowrap;
+    max-width:300px; opacity:1; transition:max-width .5s cubic-bezier(.4,0,.2,1), opacity .35s ease}
+  .ymmb-hero-sp{display:inline-block; vertical-align:bottom; overflow:hidden; width:.55em;
+    transition:width .5s cubic-bezier(.4,0,.2,1)}
+  .ymmb-hero-sp::before{content:" "}
+  .ymmb-hero.collapsed .rest{max-width:0; opacity:0}
+  .ymmb-hero.collapsed .ymmb-hero-sp{width:0}
+  .ymmb-hero.collapsed .keep{color:var(--ymmb-horizon-amber); letter-spacing:.05em}
+  .ymmb-board{margin-top:22px}
+  .ymmb-board-row{display:flex; flex-wrap:wrap; gap:clamp(3px,1vw,6px); align-items:center; margin-bottom:6px}
+  .ymmb-board-row .flap{position:relative; overflow:hidden; background:linear-gradient(180deg,#26325a,#1c2745);
+    border:1px solid var(--ymmb-line); border-radius:4px;
+    width:clamp(20px,6.2vw,30px); height:clamp(28px,8.6vw,42px);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--ymmb-mono); font-weight:700; font-size:clamp(15px,4.4vw,24px); color:var(--ymmb-mist);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 3px rgba(0,0,0,.3); flex:0 0 auto}
+  .ymmb-board-row .flap::after{content:""; position:absolute; left:0; right:0; top:50%; height:1px;
+    background:rgba(0,0,0,.45)}
+  .ymmb-board-row .flap.space{background:transparent; border-color:transparent; box-shadow:none; width:clamp(9px,2.4vw,14px)}
+  .ymmb-clock{font-family:var(--ymmb-mono); font-size:15px; color:var(--ymmb-horizon-amber); letter-spacing:.04em; margin-top:6px}
+  .ymmb-greeting{font-size:26px; font-weight:800; margin-top:26px; letter-spacing:-.01em; color:var(--ymmb-mist)}
+  .ymmb-subline{color:var(--ymmb-tarmac); margin-top:6px; font-size:15px; max-width:52ch; line-height:1.5}
+  .ymmb-panel{background:var(--ymmb-dawn-panel); border:1px solid var(--ymmb-line); border-radius:var(--u4);
+    padding:22px 24px; margin-top:18px}
+  .ymmb-panel-label{font-family:var(--ymmb-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ymmb-tarmac)}
+  .ymmb-asof{color:var(--ymmb-tarmac-dim); text-transform:none; letter-spacing:0}
+  .ymmb-wx-headline{display:flex; align-items:baseline; gap:14px; margin-top:10px; flex-wrap:wrap}
+  .ymmb-wx-temp{font-size:44px; font-weight:800; font-family:var(--ymmb-mono); color:var(--ymmb-mist); letter-spacing:-.02em}
+  .ymmb-wx-cond{color:var(--ymmb-mist); font-size:15px}
+  .ymmb-wx-sub{color:var(--ymmb-tarmac); font-size:13px; margin-top:2px}
+  .ymmb-wx-note{margin-top:14px; padding:10px 14px; background:var(--ymmb-horizon-amber-dim);
+    border-left:2px solid var(--ymmb-horizon-amber); border-radius:0 var(--u2) var(--u2) 0;
+    font-size:13.5px; color:var(--ymmb-mist)}
+  .ymmb-outlook{display:flex; gap:0; margin-top:18px; border-top:1px solid var(--ymmb-line2); padding-top:14px}
+  .ymmb-outlook-day{flex:1; text-align:center; padding:0 4px}
+  .ymmb-outlook-day .d{font-family:var(--ymmb-mono); font-size:10.5px; letter-spacing:.08em; color:var(--ymmb-tarmac-dim); text-transform:uppercase}
+  .ymmb-outlook-day .t{font-family:var(--ymmb-mono); font-size:16px; font-weight:700; color:var(--ymmb-mist); margin-top:4px}
+  .ymmb-outlook-day .p{font-size:10.5px; color:var(--ymmb-tarmac); margin-top:2px}
+  .ymmb-teaser{min-height:118px; display:flex; flex-direction:column; justify-content:space-between}
+  .ymmb-teaser-body{color:var(--ymmb-tarmac); font-size:13px; margin-top:10px; line-height:1.5}
+  .ymmb-soon{display:inline-block; margin-top:14px; font-family:var(--ymmb-mono); font-size:10.5px;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--ymmb-horizon-amber);
+    border:1px solid rgba(242,163,64,.35); padding:3px 8px; border-radius:20px; width:fit-content}
+  .ymmb-notices{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px}
+  .ymmb-notices .ymmb-panel-label{margin:0}
+  .ymmb-foot{margin-top:34px; text-align:center; font-family:var(--ymmb-mono); font-size:10.5px;
+    color:var(--ymmb-tarmac-dim); letter-spacing:.06em}
 </style>
 
 <div id="splash">
@@ -449,6 +520,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <button data-v="home" class="active">Home</button>
       <button data-v="signout">Solo Signout</button>
       <button data-v="maintenance">Maintenance</button>
+      <button data-v="ymmb" id="ymmbNavBtn">Management Briefing</button>
     </nav>
     <div class="userchip"><span class="dot"></span> Instructor · prototype</div>
   </header>
@@ -662,6 +734,74 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       </div>
       </div>
     </section>
+
+    <section class="view ymmb-view" data-view="ymmb">
+      <div class="ymmb-eyebrow"><span class="ymmb-dot"></span> LEARN TO FLY MELBOURNE</div>
+
+      <div class="ymmb-hero" id="ymmbHero"><span class="ymmb-word"><span class="keep">Y</span><span class="rest">our</span></span><span class="ymmb-hero-sp"></span><span class="ymmb-word"><span class="keep">M</span><span class="rest">orning</span></span><span class="ymmb-hero-sp"></span><span class="ymmb-word"><span class="keep">M</span><span class="rest">anagement</span></span><span class="ymmb-hero-sp"></span><span class="ymmb-word"><span class="keep">B</span><span class="rest">rief</span></span></div>
+
+      <div class="ymmb-board">
+        <div class="ymmb-board-row" id="ymmbBoardRowDay"></div>
+        <div class="ymmb-board-row" id="ymmbBoardRowDate"></div>
+      </div>
+      <div class="ymmb-clock" id="ymmbClock"></div>
+
+      <div class="ymmb-greeting">Good morning.</div>
+      <div class="ymmb-subline" id="ymmbSubline">Here's the state of play before the first trial flight taxis out.</div>
+
+      <div class="ymmb-panel">
+        <div class="ymmb-panel-label">Weather at YMMB <span id="ymmbWxAsOf" class="ymmb-asof"></span></div>
+        <div class="ymmb-wx-headline">
+          <div class="ymmb-wx-temp">12°C</div>
+          <div>
+            <div class="ymmb-wx-cond">Clear with periodic clouds</div>
+            <div class="ymmb-wx-sub">Today's high 15°C · 35% chance of rain</div>
+          </div>
+        </div>
+        <div class="ymmb-wx-note" id="ymmbWxNote">Bring a coat to the line — looks flyable, but keep an eye on that afternoon rain chance.</div>
+        <div class="ymmb-outlook">
+          <div class="ymmb-outlook-day"><div class="d">Tue</div><div class="t">15°</div><div class="p">35%</div></div>
+          <div class="ymmb-outlook-day"><div class="d">Wed</div><div class="t">14°</div><div class="p">20%</div></div>
+          <div class="ymmb-outlook-day"><div class="d">Thu</div><div class="t">15°</div><div class="p">10%</div></div>
+          <div class="ymmb-outlook-day"><div class="d">Fri</div><div class="t">16°</div><div class="p">10%</div></div>
+          <div class="ymmb-outlook-day"><div class="d">Sat</div><div class="t">16°</div><div class="p">10%</div></div>
+        </div>
+      </div>
+
+      <div class="ymmb-panel">
+        <div class="ymmb-panel-label">Fleet Status <span id="ymmbFleetAsOf" class="ymmb-asof"></span></div>
+        <div class="ymmb-wx-headline">
+          <div class="ymmb-wx-temp" id="ymmbFleetPct">100%</div>
+          <div>
+            <div class="ymmb-wx-cond" id="ymmbFleetCount">27 of 27 aircraft operational</div>
+            <div class="ymmb-wx-sub" id="ymmbFleetWarn">5 have an open maintenance item — not the same as grounded, worth a glance</div>
+          </div>
+        </div>
+        <div class="ymmb-outlook" id="ymmbFleetTypes">
+          <div class="ymmb-outlook-day"><div class="d">DA40</div><div class="t">9</div></div>
+          <div class="ymmb-outlook-day"><div class="d">C172</div><div class="t">6</div></div>
+          <div class="ymmb-outlook-day"><div class="d">SLG2</div><div class="t">5</div></div>
+          <div class="ymmb-outlook-day"><div class="d">PA44</div><div class="t">4</div></div>
+          <div class="ymmb-outlook-day"><div class="d">8KCAB</div><div class="t">2</div></div>
+          <div class="ymmb-outlook-day"><div class="d">DA42</div><div class="t">1</div></div>
+        </div>
+      </div>
+
+      <div class="ymmb-panel ymmb-teaser">
+        <div>
+          <div class="ymmb-panel-label">Bookings</div>
+          <div class="ymmb-teaser-body">Booking counts, trial flights, and syllabus sorties for the day — pulled straight from the schedule.</div>
+        </div>
+        <div class="ymmb-soon">Coming soon</div>
+      </div>
+
+      <div class="ymmb-panel ymmb-notices">
+        <div class="ymmb-panel-label">Notices &amp; Warnings</div>
+        <div class="ymmb-soon" style="margin-top:0">Coming soon</div>
+      </div>
+
+      <div class="ymmb-foot">YMMB v1 · a small morning ritual · not an operational authority</div>
+    </section>
   </main>
 
   <div class="foot" id="foot"></div>
@@ -773,7 +913,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.67.0";
+const VERSION="v0.72.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -1338,6 +1478,11 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.72.0",d:"YMMB reordered to Weather / Fleet Status / Bookings / Notices. Fleet Status is now a real panel (not a 'coming soon' teaser): leads with the operational percentage, then the count, then a breakdown by aircraft type (DA40/C172/SLG2/PA44/8KCAB/DA42). Figures are a real snapshot from the FlightLogger proxy testing earlier in the project — 27 real aircraft, same VH- filter as the Maintenance page's fleet grid (simulators/standby/ground-reserve excluded) — stamped 'as of' the same way weather is, since it's a snapshot, not a live feed. 'Operational' is deliberately kept separate from 'has an open maintenance item' — a routine upcoming check isn't the same as being grounded, so the two aren't conflated into one number. 'Today's Flying' renamed to 'Bookings', still a coming-soon teaser."},
+  {v:"v0.71.0",d:"Fixed the YMMB hero title reading as one squished-together word ('YourMorningManagementBrief') in its expanded state — the inter-word gap was capped too tight (max-width:.32em, which the space glyph could get clipped inside). Switched to an explicit, more generous width (.55em) that still collapses cleanly to 0 when it animates into 'YMMB'. Verified: consistent ~20px visible gaps between words while expanded, and the collapse still converges the Y/M/M/B letters tightly together same as before."},
+  {v:"v0.70.0",d:"YMMB hero title now holds for 4.1s (was 1.1s) before collapsing into 'YMMB' — more time to actually read the full phrase before it animates."},
+  {v:"v0.69.0",d:"YMMB tab simplified to a static 'Management Briefing' label — the collapse-on-click behaviour moved off the nav and onto the page itself. Opening the tab now plays a proper intro: 'Your Morning Management Brief' holds for a beat, fully readable, then genuinely collapses down into 'YMMB' — the Y/M/M/B letters actually move together as the rest of each word shrinks away (real layout reflow via max-width transitions, not a visual-only trick — verified the letters' on-screen positions converge). The split-flap day/date board flips in alongside it. Both animations replay every time the tab is visited, not just once, so it feels like a small ritual rather than a one-off. Respects prefers-reduced-motion (lands directly on the final state, no hold or flicker)."},
+  {v:"v0.68.0",d:"Added YMMB — Your Morning Management Brief — as a new top-nav tab, merged in from a standalone prototype. A small personal morning page: a split-flap departure-board header (day/date, flips in on load, live clock), a real Moorabbin weather snapshot (stamped with the date it reflects since this is static, not a live feed), and two honest 'coming soon' teasers for Today's Flying and Fleet & Maintenance. De-personalised per request — no name anywhere, just 'Good morning.' The nav tab itself reads 'Your Morning Management Brief' until clicked, then collapses to 'YMMB' while active and reverts when you navigate away. All new CSS/JS is ymmb-prefixed to avoid any collision with the rest of the app's shared tokens/identifiers."},
   {v:"v0.67.0",d:"Maintenance page suspended at Nick's request — greyed out (desaturated + dimmed) with a 'Not yet deployed' watermark, and interaction fully blocked (tile clicks do nothing, both via CSS pointer-events and a JS guard). The live FlightLogger fetch is not called at all while suspended — no network request happens, not just a hidden result. Nothing was removed or torn down: all content, live-wiring, and the full fleet grid from the last two rounds are intact underneath, controlled by a single MAINT_SUSPENDED flag. Flip it back to false to fully restore normal behaviour with no other changes needed anywhere in the file."},
   {v:"v0.66.0",d:"Maintenance fleet grid now shows every real aircraft FlightLogger returns (28, up from the fixed 9), not just the ones already known about — any VH-registered aircraft in the live data gets a tile automatically. Non-aircraft entries (ALSIM simulators, Standby placeholders, GRD/Reserve) are deliberately excluded. Only DA40s have a traced planform diagram, so non-DA40 types (C172, PA44, SLG2 glider, 8KCAB, DA42) now show a plain tinted square placeholder instead — clicking any of them still gives full live detail (model, landings, fuel, current warning), the diagram is just a stand-in until real artwork exists for those types."},
   {v:"v0.65.0",d:"Maintenance page now connects to live FlightLogger data via the proxy Worker (see /ltfos-proxy). The 'Aircraft Maintenance Data' checker shows real [LIVE]/[FETCH FAILED] status instead of the permanent demo failure. Every aircraft the API returns is now a clickable tile — not just VH-KAI — colored by whether it has an open maintenance warning; clicking any of them fetches and shows its real warning, total landings, and total fuel, clearly marked [LIVE]. VH-KAI keeps its full existing static panel (gauge, header stats, current/previous parts tables) untouched, with the real live warning layered on underneath. Known gap: FlightLogger's maintenanceParts records return null for every part regardless of query (a permission boundary on the connected account's role, not a bug — needs a token with elevated maintenance-parts visibility), so the parts tables stay as the last-synced static snapshot for now. Degrades cleanly if the proxy is unreachable — VH-KAI's static data keeps working, other tiles correctly stay disabled rather than showing broken data."},
@@ -1903,4 +2048,106 @@ renderNavList();
 drawMap();
 document.querySelectorAll('.banner').forEach(b=>{b.innerHTML=b.innerHTML.replace('{MAGVAR}',MAGVAR);});
 $("#provenanceNote").textContent=`Fleet W&B/fuel figures verified ${DATA_VERIFIED} — DA40 W&B sheet v2.2, CASR Exposition v13.0, LTF instructor handbook.`;
+
+// ---- YMMB (Your Morning Management Brief) ----------------------------
+// Hero title collapse ("Your Morning Management Brief" -> "YMMB"), a
+// split-flap board (day + date), a live clock, and a weather snapshot.
+// All identifiers here are ymmb-prefixed deliberately — this was merged in
+// from a separate standalone file and the app's script already uses `now`
+// as a variable name elsewhere, so every top-level name here is namespaced
+// to avoid any collision.
+const ymmbNow=new Date();
+const ymmbDow=ymmbNow.toLocaleDateString('en-AU',{weekday:'long'}).toUpperCase();
+const YMMB_MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const ymmbDateStr=String(ymmbNow.getDate()).padStart(2,'0')+' '+YMMB_MONTHS[ymmbNow.getMonth()]+' '+ymmbNow.getFullYear();
+const YMMB_GLYPHS='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const ymmbReduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function ymmbBuildFlapRow(containerEl,text,startDelay){
+  containerEl.innerHTML=""; // clear so this can replay on every visit, not just the first
+  [...text].forEach((ch,i)=>{
+    const el=document.createElement('div');
+    if(ch===' '){
+      el.className='flap space';
+      containerEl.appendChild(el);
+      return;
+    }
+    el.className='flap';
+    containerEl.appendChild(el);
+    if(ymmbReduceMotion){
+      el.textContent=ch;
+      return;
+    }
+    let ticks=0;
+    const maxTicks=5+Math.floor(Math.random()*4);
+    const delay=startDelay+i*40;
+    setTimeout(()=>{
+      const iv=setInterval(()=>{
+        ticks++;
+        if(ticks>=maxTicks){
+          el.textContent=ch;
+          clearInterval(iv);
+        }else{
+          el.textContent=YMMB_GLYPHS[Math.floor(Math.random()*YMMB_GLYPHS.length)];
+        }
+      },45);
+    },delay);
+  });
+}
+
+function ymmbUpdateClock(){
+  const t=new Date();
+  $("#ymmbClock").textContent=t.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})+' local';
+}
+ymmbUpdateClock();
+setInterval(ymmbUpdateClock,1000);
+
+// Weather figures are a real forecast snapshot (fetched, not invented), not
+// a live feed — this is a static file, so the panel is stamped with the
+// date it reflects rather than silently going stale on a later morning.
+const ymmbDowShort=ymmbDow.charAt(0)+ymmbDow.slice(1,3).toLowerCase();
+$("#ymmbWxAsOf").textContent='· as of '+ymmbDowShort+' '+ymmbDateStr.split(' ').slice(0,2).join(' ');
+
+// Fleet Status figures are a real snapshot too (from the FlightLogger proxy
+// testing earlier in this project — 27 real aircraft, VH- registrations
+// only, simulators/standby/ground-reserve entries excluded, same filter as
+// the Maintenance page's fleet grid), not invented and not live right now —
+// same "as of" honesty treatment as the weather panel above. "Operational"
+// = not disabled in FlightLogger; the open-maintenance-item count is a
+// separate, deliberately not-conflated stat, since an upcoming routine
+// check isn't the same thing as being grounded.
+$("#ymmbFleetAsOf").textContent='· as of '+ymmbDowShort+' '+ymmbDateStr.split(' ').slice(0,2).join(' ');
+const YMMB_RAIN_CHANCE=35;
+if(YMMB_RAIN_CHANCE>=50){
+  $("#ymmbSubline").textContent="Here's the state of play — worth checking the radar before trial flights go out today.";
+  $("#ymmbWxNote").textContent="Decent chance of rain today — worth a look at the radar before committing trial flights to the schedule.";
+}else if(YMMB_RAIN_CHANCE<=15){
+  $("#ymmbSubline").textContent="Here's the state of play before the first trial flight taxis out. Looking like a good one out there.";
+  $("#ymmbWxNote").textContent="Low rain chance and clear-ish skies — should be a straightforward day on the line.";
+}
+
+// Plays the full intro sequence: hero title starts as the full phrase, holds
+// for a beat so it's actually readable, then collapses down to "YMMB" while
+// the split-flap day/date board flips in alongside it — like an airport
+// sign settling into place. Replays every time the tab is visited, not just
+// the first time, since this is meant to feel like a small daily ritual
+// rather than a one-off animation you only see once.
+function ymmbPlayIntro(){
+  const hero=$("#ymmbHero");
+  hero.classList.remove("collapsed");
+  ymmbBuildFlapRow($("#ymmbBoardRowDay"),ymmbDow,0);
+  ymmbBuildFlapRow($("#ymmbBoardRowDate"),ymmbDateStr,ymmbDow.length*40+120);
+  if(ymmbReduceMotion){
+    hero.classList.add("collapsed"); // skip the hold-then-collapse beat, land immediately
+    return;
+  }
+  setTimeout(()=>hero.classList.add("collapsed"),4100);
+}
+
+const _ymmbOrigGoView=goView;
+goView=function(v){
+  _ymmbOrigGoView(v);
+  if(v==="ymmb") ymmbPlayIntro();
+};
+
 </script>
