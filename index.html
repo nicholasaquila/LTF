@@ -235,6 +235,9 @@
     color:var(--ink); font-family:var(--font-mono)}
   .fltable input:focus{outline:none; border-color:var(--sky); box-shadow:0 0 0 2px rgba(36,168,216,.15)}
   .fltable td.computed{font-family:var(--font-mono); font-weight:700; color:var(--sky); text-align:center}
+  .fltable tr.fl-sep td{height:10px; padding:0; background:transparent; border-left:none; border-right:none}
+  .fltable tr.fl-redepart td{border-top:2px solid var(--line2)}
+  .fltable tr.fl-redepart td:first-child{color:var(--sky)!important}
   .maplegend{position:absolute; top:56px; right:var(--u6); font-size:10.5px; color:var(--dim);
     background:rgba(18,22,31,.92); padding:var(--u2) var(--u3); border-radius:var(--r1); line-height:1.8; border:1px solid var(--line)}
   .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle} /* point-scale exception */
@@ -753,7 +756,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.62.0";
+const VERSION="v0.64.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -775,9 +778,9 @@ const MAINT_AIRCRAFT={
   reg:"VH-KAI", type:"DA40 IFR [LRT]", base:"YMMB",
   oilConsumption:"0.02 US qt/h",
   stat1:"33.0", // unlabelled in the source export — meaning not confirmed
-  ttaf:"2576.3", // likely Total Time Airframe — inferred from position/value, not confirmed
-  tach:"8399.8", // likely Tach time — inferred from being paired closely with the next figure
-  hobbs:"8394.8", // likely Hobbs time — same basis as above
+  ttaf:"2583.8", // likely Total Time Airframe — inferred from position/value, not confirmed
+  tach:"8404.6", // likely Tach time — inferred from being paired closely with the next figure
+  hobbs:"8399.6", // likely Hobbs time — same basis as above
 };
 const MAINT_CURRENT=[
   {name:"100 HOUR / ANNUAL",expiry_date:"16-06-2027",expiry_hours:"8453.3",uploaded_date:"08-05-2025",uploaded_by:"D.Annetta",approved_date:"16-06-2026",approved_by:"D.Annetta"},
@@ -874,7 +877,7 @@ const AC_ANCHORS={
 };
 const PLANFORM_PATH="m 427.19673,620.818 c -0.36667,-0.36667 -0.66776,-5.42917 -0.66909,-11.25 -0.001,-5.82084 -0.44644,-16.43334 -0.98913,-23.58334 -0.54268,-7.15 -3.89702,-56.68175 -7.4541,-110.07057 -3.55707,-53.38881 -6.86501,-98.16381 -7.35097,-99.5 -0.48596,-1.33618 -1.9375,-7.92665 -3.22566,-14.64547 l -2.34209,-12.21605 -4.56781,-0.63526 c -2.5123,-0.34939 -8.61782,-1.49043 -13.56782,-2.53565 -4.95,-1.04521 -16.2,-3.9329 -25,-6.41707 -8.8,-2.48418 -21.16378,-5.41588 -27.47507,-6.5149 -7.95921,-1.38597 -23.73836,-2.59123 -51.5,-3.9337 -22.01371,-1.06452 -43.15661,-2.0355 -46.98422,-2.15773 l -6.9593,-0.22223 -8.5407,34.13078 c -4.69739,18.77192 -8.99071,34.55432 -9.54071,35.07199 -0.55,0.51767 -4.4411,2.35994 -8.64689,4.09394 -6.34789,2.61715 -8.72611,3.10168 -14,2.85232 l -6.35311,-0.3004 -0.21827,-7 c -0.12005,-3.85 -0.71211,-16.1768 -1.3157,-27.3929 -1.00437,-18.66358 -1.27227,-20.53449 -3.15918,-22.06242 l -2.06175,-1.6695 v -24.23747 c 0,-23.1774 0.091,-24.33438 2.08148,-26.4531 1.87869,-1.99977 2.18547,-4.16257 3.14898,-22.20011 0.58714,-10.99147 1.17033,-23.3595 1.29598,-27.4845 l 0.22846,-7.5 6,-0.28328 c 5.09313,-0.24047 7.35255,0.29349 14.94857,3.53274 l 8.94858,3.81603 8.55142,34.14388 c 4.70329,18.77914 8.80353,34.39151 9.11165,34.69415 0.30812,0.30264 19.43312,-0.33101 42.5,-1.4081 23.06688,-1.0771 44.86478,-2.22704 48.43978,-2.55543 3.575,-0.32838 10.55,-1.25936 15.5,-2.06885 4.95,-0.80948 17.55,-3.87233 28,-6.80634 10.45,-2.934 21.7,-5.84024 25,-6.45832 3.3,-0.61807 8.25,-1.46734 11,-1.88726 l 5,-0.7635 3.22782,-14.97786 c 2.92297,-13.56335 3.56153,-19.88873 6.76146,-66.97786 1.94351,-28.6 5.3285,-78.36515 7.52219,-110.58922 2.19369,-32.22407 3.98853,-63.16157 3.98853,-68.75 V 19.48466 h 8.39986 8.39985 l 15.35015,7.03607 c 8.44258,3.86984 15.97387,7.65963 16.73619,8.42176 1.14192,1.14163 1.71039,20.90633 3.22748,112.21394 l 1.84143,110.82823 3.13063,15 c 1.72185,8.25 3.46693,15.36246 3.87797,15.80546 0.41104,0.44299 5.87489,1.20551 12.1419,1.69447 6.267,0.48896 20.61954,1.84536 31.89454,3.01423 11.275,1.16886 25.33192,2.96384 31.23759,3.98884 5.90567,1.02499 11.15101,2.11914 11.65632,2.43143 0.5053,0.3123 1.23494,2.86698 1.62143,5.67707 l 0.7027,5.10926 3.89098,-0.6222 c 2.30673,-0.36886 3.89098,-0.22154 3.89098,0.36183 0,0.54121 2.21792,1.93814 4.9287,3.10429 2.71078,1.16614 5.67195,2.94154 6.58036,3.94533 0.90841,1.00379 1.503,2.85921 1.3213,4.12317 -0.18169,1.26395 -1.83298,3.30826 -3.66952,4.54289 -1.97476,1.32756 -5.70436,2.51239 -9.12757,2.89968 -3.18362,0.36019 -6.26579,0.94993 -6.84926,1.31053 -0.58348,0.36061 -1.43225,2.87087 -1.88616,5.57836 l -0.8253,4.9227 -6.98627,1.31629 c -3.84245,0.72397 -11.26128,1.95474 -16.48628,2.73504 -5.225,0.78031 -20.075,2.3472 -33,3.48198 -12.925,1.13479 -25.28732,2.17937 -27.47183,2.3213 l -3.97183,0.25805 -3.18702,14.59348 -3.18702,14.59348 -1.94891,111.73651 c -1.86428,106.88407 -2.03109,111.81734 -3.84115,113.59769 -1.04073,1.02365 -8.76028,5.03766 -17.15455,8.92002 -14.51349,6.71249 -15.62152,7.05882 -22.58334,7.05882 -4.02655,0 -7.62101,-0.3 -7.98768,-0.66666 z";
 const MAINT_KNOWN_AIRCRAFT=[...FLEET.map(f=>({reg:f.reg,type:"DA40"})), {reg:"VH-KAI",type:"DA40 IFR [LRT]"}];
-const MAINT_100HR_DUE=8453.3, MAINT_50HR_DUE=8403.3, MAINT_CURRENT_HRS=8399.8, MAINT_TOL=5;
+const MAINT_100HR_DUE=8453.3, MAINT_50HR_DUE=8403.3, MAINT_CURRENT_HRS=8404.6, MAINT_TOL=5;
 const cycleStart=MAINT_100HR_DUE-100;
 const remaining=MAINT_100HR_DUE-MAINT_CURRENT_HRS;
 const remainingPct=Math.max(0,Math.min(100,remaining));
@@ -920,8 +923,11 @@ $("#maintTiles").addEventListener("click",e=>{
 // next 100hr/annual is due at 8453.3 (tach), the cluster of 50-hour-interval
 // items are all due at 8403.3 (exactly the cycle's own midpoint — confirms
 // the 50hr check is a genuine interim point within the same 100hr cycle,
-// not a separate/unrelated one), current tach 8399.8 is the same
-// (flagged-as-inferred) figure already shown in the header above.
+// not a separate/unrelated one), current tach 8404.6 is the same
+// (flagged-as-inferred) figure already shown in the header above. As of this
+// export the aircraft has passed the nominal 50hr point (8403.3) and sits
+// inside its ±5 tolerance band (upper limit 8408.3, ~3.7hr away), and is now
+// 48.7hr from the 100hr/annual — i.e. under 50, so the gauge reads amber.
 // Higher-detail pass on the planform (10 Jul 2026, user asked for less "low poly").
 // Honest note on method: I tried to trace this directly from the uploaded POH photo's
 // pixels a second time, at much higher density, but the three 3-view drawings on that
@@ -1132,6 +1138,8 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.64.0",d:"Updated VH-KAI to the latest FlightLogger export: TTAF 2583.8, Tach 8404.6, Hobbs 8399.6 (up ~4.8hr since the previous figures). The aircraft has now passed the nominal 50-hour point (8403.3) and sits inside its ±5 tolerance band, and is 48.7hr from the 100-hour/annual — under 50 — so the 100-hour gauge (and the VH-KAI fleet tile) now read amber instead of green. Maintenance parts tables were unchanged (same snapshot, just viewed at higher current hours)."},
+  {v:"v0.63.0",d:"Flight log now follows the paper form's full-stop convention: when a waypoint is marked as a full-stop landing, it gets a blank separator row and is then repeated on a new line as the departure point for the next leg (turning points / overflies stay a single row; the final arrival isn't repeated since there's no next leg). Ticking/unticking a Full Stop box rebuilds the table live. Leg TRK/DIST still compute correctly across the split, the departure row stays locked (can't be a full-stop), and the qualifying-flight count still counts each landing once (the repeated departure rows have no checkbox)."},
   {v:"v0.62.0",d:"Two fixes. (1) Flight planning: the departure aerodrome (first row) is no longer marked as a full-stop landing by default — you take off from it, you don't land there. This also fixes a miscount on round-trip routes (YMMB→…→YMMB), where matching full-stops by code was ticking the departure YMMB as well as the arrival; the departure row is now always excluded, so the qualifying-flight full-stop count reflects actual landings. (2) Data integrity checkers: the Maintenance page's three checkers now use an aligned grid so the labels and the [FETCH FAILED] markers line up in columns down the page (matching how the Home page checkers were already aligned)."},
   {v:"v0.61.0",d:"Fixed the cockpit anchor that kept landing on the right wing root: corrected AC_ANCHORS to the true fuselage centreline at viewBox x=301 (the viewBox centre), not the x=385 an earlier screen-to-viewBox mapping had produced from wrong wingtip references. Measured the rendered plane's actual bounds directly this time (centre x≈301, wingtips at the viewBox edges) rather than mapping from a screenshot. The WhatsApp cockpit dot now sits dead-centre on the fuselage; wingtip/propeller/tail anchors corrected to match too."},
   {v:"v0.60.0",d:"Added a named anchor map (AC_ANCHORS) for the aircraft diagram — cockpit, propeller, both wingtips, and tail, in gauge viewBox coords — derived directly from a screenshot the user annotated with the real location of each. These give maintenance-warning leaders a reliable set of reference points to draw to (a located squawk points at its part; a vague symptom points at the cockpit). Repointed the WhatsApp callout to the user-marked cockpit position, which sits on the plane's visual centreline (the traced fill is slightly right of that, which is why earlier anchors looked wing-ward)."},
@@ -1505,6 +1513,20 @@ fpAcSel.dispatchEvent(new Event("change"));
 
 
 let curRoute=ROUTES.find(r=>r.id==="ppl1")||ROUTES[0];
+// Full-stop landing state: a Set of waypoint indices marked as full-stop landings.
+// Seeded from the route (final arrival + any syllabus-confirmed full-stop waypoints;
+// never the departure at i===0), then mutated live as the user ticks/unticks boxes.
+let fsState=new Set();
+function seedFullStops(){
+  const pts=curRoute.legs;
+  fsState=new Set();
+  pts.forEach((code,i)=>{
+    if(i===0) return; // departure is a takeoff, never a full-stop
+    const isFS = curRoute.fullStops ? curRoute.fullStops.includes(code) : (i===pts.length-1);
+    if(isFS) fsState.add(i);
+  });
+}
+seedFullStops();
 function routeDist(r){let d=0;for(let i=0;i<r.legs.length-1;i++)d+=nm(WP[r.legs[i]],WP[r.legs[i+1]]);return d;}
 function renderNavList(f=""){
   const q=f.toLowerCase();
@@ -1518,7 +1540,7 @@ function renderNavList(f=""){
     ).join("");
   }).join("");
   document.querySelectorAll(".navitem").forEach(el=>el.addEventListener("click",()=>{
-    curRoute=ROUTES.find(r=>r.id===el.dataset.id); renderNavList($("#navSearch").value); drawMap();
+    curRoute=ROUTES.find(r=>r.id===el.dataset.id); seedFullStops(); renderNavList($("#navSearch").value); drawMap();
   }));
 }
 $("#navSearch").addEventListener("input",e=>renderNavList(e.target.value));
@@ -1588,18 +1610,37 @@ function drawMap(){
   // is a blank editable field — this tool can't know planned altitude, TAS,
   // forecast wind, or heading/GS/ETA derived from them, so it doesn't guess.
   let flRows="";
+  // Full-stop landings follow the paper Flight Log convention: the aerodrome you
+  // land at gets a blank separator row, then is repeated on a new line as the
+  // departure point for the next leg (see the LTF paper form). Turning points /
+  // overflies are a single row. `fsState` holds which waypoint indices are marked
+  // full-stop; it's seeded from the route's syllabus full-stops and updated live
+  // when the user ticks/unticks a box. The departure (i===0) is never a full-stop
+  // (you take off from it). The final arrival is a full-stop landing but has no
+  // next leg, so it gets no repeat row.
+  const blankCells=(tag)=>`<td><input type="text" id="fl-${tag}-lsalt"></td>
+      <td><input type="text" id="fl-${tag}-alt"></td>
+      <td><input type="text" id="fl-${tag}-tas"></td>
+      <td class="computed"></td>
+      <td><input type="text" id="fl-${tag}-wind"></td>
+      <td><input type="text" id="fl-${tag}-hdg"></td>
+      <td><input type="text" id="fl-${tag}-gs"></td>
+      <td class="computed"></td>
+      <td><input type="text" id="fl-${tag}-eta"></td>
+      <td><input type="text" id="fl-${tag}-plan"></td>
+      <td><input type="text" id="fl-${tag}-rev"></td>
+      <td><input type="text" id="fl-${tag}-ata"></td>`;
   pts.forEach((p,i)=>{
     const hasLeg=i>0;
     const trkCell=hasLeg?pad3((trk(pts[i-1],p)-MAGVAR+360)%360):"";
     const distCell=hasLeg?nm(pts[i-1],p).toFixed(1):"";
-    // DA40 routes default TAS to N0120 (ICAO flight-plan notation for 120kt
-    // true airspeed) — a sensible planning figure for this type, still fully
-    // editable per-leg since actual TAS depends on power setting/altitude/
-    // conditions for the specific flight.
     const tasDefault=(hasLeg&&curRoute.ac==="DA40")?"N0120":"";
+    const isFullStop=fsState.has(i);
+    const isFinal=i===pts.length-1;
+    // Main waypoint row (arrival at this point, or turning point)
     flRows+=`<tr>
       <td style="font-family:var(--font-mono);font-weight:700;color:var(--ink)">${p.code}${p.ap?'*':''}</td>
-      <td style="text-align:center"><input type="checkbox" id="fl-${i}-fullstop" class="fl-fullstop" ${(i!==0&&(curRoute.fullStops?curRoute.fullStops.includes(p.code):i===pts.length-1))?"checked":""}></td>
+      <td style="text-align:center"><input type="checkbox" id="fl-${i}-fullstop" class="fl-fullstop" data-wp="${i}" ${isFullStop?"checked":""}${i===0?" disabled title='Departure — you take off from here, not a full-stop landing'":""}></td>
       <td><input type="text" id="fl-${i}-lsalt"></td>
       <td><input type="text" id="fl-${i}-alt"></td>
       <td><input type="text" id="fl-${i}-tas" value="${tasDefault}"></td>
@@ -1613,10 +1654,24 @@ function drawMap(){
       <td><input type="text" id="fl-${i}-rev"></td>
       <td><input type="text" id="fl-${i}-ata"></td>
     </tr>`;
+    // Full-stop (but not the final arrival): blank separator + repeated departure row
+    if(isFullStop && !isFinal){
+      flRows+=`<tr class="fl-sep"><td colspan="14"></td></tr>`;
+      flRows+=`<tr class="fl-redepart">
+        <td style="font-family:var(--font-mono);font-weight:700;color:var(--ink)">${p.code}${p.ap?'*':''}</td>
+        <td></td>
+        ${blankCells(`redep-${i}`)}
+      </tr>`;
+    }
   });
   $("#legTable").innerHTML=`<thead><tr><th>WP</th><th>Full Stop</th><th>LSALT</th><th>ALT</th><th>TAS</th><th>TRK(M)</th><th>WIND(M)</th><th>HDG(M)</th><th>GS</th><th>DIST</th><th>ETA MIN</th><th>PLAN EST</th><th>REV EST</th><th>ATA/ATD</th></tr></thead>
     <tbody>${flRows}</tbody>`;
-  document.querySelectorAll(".fl-fullstop").forEach(cb=>cb.addEventListener("change",updateQualNav));
+  document.querySelectorAll(".fl-fullstop").forEach(cb=>cb.addEventListener("change",e=>{
+    const idx=+e.target.dataset.wp;
+    if(idx===0){e.target.checked=false; return;} // departure can't be a full-stop
+    if(e.target.checked) fsState.add(idx); else fsState.delete(idx);
+    drawMap(); // re-render so the blank separator + repeated departure row appear/disappear
+  }));
   updateQualNav();
 }
 function updateQualNav(){
