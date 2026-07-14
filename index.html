@@ -756,7 +756,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.65.0";
+const VERSION="v0.66.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -886,17 +886,26 @@ const fiftyMarkPct=(MAINT_50HR_DUE-cycleStart); // where the 50hr checkpoint sit
 const tolPct=MAINT_TOL; // +/- band width in the same 0-100 units (1 unit = 1 hour)
 let _tileClipN=0;
 function tilePlanformSVG(mode, color){
-  // Mini version of the 100-hour gauge planform, three modes:
-  //  'empty' — no data at all (faint grey silhouette, tile stays disabled)
-  //  'gauge' — VH-KAI only: the real percentage-fill gauge using the tuned
-  //            MAINT_100HR_DUE/MAINT_CURRENT_HRS figures (unchanged from before)
-  //  'flat'  — live FlightLogger aircraft where we only know "has an open
-  //            warning: yes/no" from worstMaintenanceWarning, not a precise
-  //            hours-remaining percentage — a solid tint conveys status
-  //            without implying precision we don't have
+  // Mini version of the 100-hour gauge planform, four modes:
+  //  'empty'  — no data at all (faint grey silhouette, tile stays disabled)
+  //  'gauge'  — VH-KAI only: the real percentage-fill gauge using the tuned
+  //             MAINT_100HR_DUE/MAINT_CURRENT_HRS figures (unchanged from before)
+  //  'flat'   — live DA40 aircraft where we only know "has an open warning:
+  //             yes/no", not a precise hours-remaining percentage — a solid
+  //             tint on the real DA40 silhouette conveys status without
+  //             implying precision we don't have
+  //  'square' — live NON-DA40 aircraft (C172, PA44, SLG2, 8KCAB, DA42, etc.)
+  //             — no planform diagram exists for these types yet, so a plain
+  //             tinted square stands in rather than misusing the DA40 shape
+  //             for a different airframe
   if(mode==="empty"){
     return `<svg viewBox="0 0 ${PW} ${PH}" style="width:100%; height:38px; display:block; margin:0 auto var(--u2)">
       <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="rgba(255,255,255,.14)"/>
+    </svg>`;
+  }
+  if(mode==="square"){
+    return `<svg viewBox="0 0 100 100" style="width:100%; height:38px; display:block; margin:0 auto var(--u2)">
+      <rect x="15" y="15" width="70" height="70" rx="10" fill="${color}" opacity=".45" stroke="${color}" stroke-width="2.5"/>
     </svg>`;
   }
   if(mode==="flat"){
@@ -949,8 +958,25 @@ async function connectFlightLogger(){
   renderMaintTiles();
 }
 
+function buildMaintTileList(){
+  // Always start from the known baseline (VH-KAI + the W&B fleet) so the
+  // grid isn't empty while loading or if the live fetch fails — then add
+  // any additional real aircraft the live fleet data knows about that
+  // aren't already in that baseline. "Real aircraft" = registration starts
+  // with VH- (the Australian civil prefix); this deliberately excludes
+  // FlightLogger entries that aren't actual dispatchable aircraft: ALSIM
+  // simulators ("LTF ALSIM", "DAA ALSIM"), "Standby (...)" placeholders,
+  // and "GRD/Reserve" — per explicit user request to only show real aircraft.
+  const seen=new Set(MAINT_KNOWN_AIRCRAFT.map(a=>a.reg));
+  const extra=Object.keys(flFleetData)
+    .filter(reg=>reg.startsWith("VH-")&&!seen.has(reg))
+    .sort()
+    .map(reg=>({reg,type:flFleetData[reg].model}));
+  return [...MAINT_KNOWN_AIRCRAFT,...extra];
+}
+
 function renderMaintTiles(){
-  $("#maintTiles").innerHTML=MAINT_KNOWN_AIRCRAFT.map(a=>{
+  $("#maintTiles").innerHTML=buildMaintTileList().map(a=>{
     const isKai=a.reg===MAINT_AIRCRAFT.reg;
     const live=flFleetData[a.reg];
     const clickable=isKai||!!live;
@@ -960,7 +986,13 @@ function renderMaintTiles(){
       typeLine=a.type;
     }else if(live){
       const hasWarning=!!live.worstMaintenanceWarning;
-      svg=tilePlanformSVG("flat", hasWarning?"var(--amber)":"var(--green)");
+      const color=hasWarning?"var(--amber)":"var(--green)";
+      // Only DA40s have a real planform diagram traced — every other type
+      // (C172, PA44, SLG2 glider, 8KCAB, DA42, ...) gets a plain tinted
+      // square placeholder instead of misusing the DA40 shape for a
+      // different airframe.
+      const isDA40=/DA40/i.test(live.model||"");
+      svg=isDA40?tilePlanformSVG("flat",color):tilePlanformSVG("square",color);
       typeLine=hasWarning?live.worstMaintenanceWarning.subjectName:"No open warnings (live)";
     }else{
       svg=tilePlanformSVG("empty");
@@ -1273,6 +1305,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.66.0",d:"Maintenance fleet grid now shows every real aircraft FlightLogger returns (28, up from the fixed 9), not just the ones already known about — any VH-registered aircraft in the live data gets a tile automatically. Non-aircraft entries (ALSIM simulators, Standby placeholders, GRD/Reserve) are deliberately excluded. Only DA40s have a traced planform diagram, so non-DA40 types (C172, PA44, SLG2 glider, 8KCAB, DA42) now show a plain tinted square placeholder instead — clicking any of them still gives full live detail (model, landings, fuel, current warning), the diagram is just a stand-in until real artwork exists for those types."},
   {v:"v0.65.0",d:"Maintenance page now connects to live FlightLogger data via the proxy Worker (see /ltfos-proxy). The 'Aircraft Maintenance Data' checker shows real [LIVE]/[FETCH FAILED] status instead of the permanent demo failure. Every aircraft the API returns is now a clickable tile — not just VH-KAI — colored by whether it has an open maintenance warning; clicking any of them fetches and shows its real warning, total landings, and total fuel, clearly marked [LIVE]. VH-KAI keeps its full existing static panel (gauge, header stats, current/previous parts tables) untouched, with the real live warning layered on underneath. Known gap: FlightLogger's maintenanceParts records return null for every part regardless of query (a permission boundary on the connected account's role, not a bug — needs a token with elevated maintenance-parts visibility), so the parts tables stay as the last-synced static snapshot for now. Degrades cleanly if the proxy is unreachable — VH-KAI's static data keeps working, other tiles correctly stay disabled rather than showing broken data."},
   {v:"v0.64.0",d:"Updated VH-KAI to the latest FlightLogger export: TTAF 2583.8, Tach 8404.6, Hobbs 8399.6 (up ~4.8hr since the previous figures). The aircraft has now passed the nominal 50-hour point (8403.3) and sits inside its ±5 tolerance band, and is 48.7hr from the 100-hour/annual — under 50 — so the 100-hour gauge (and the VH-KAI fleet tile) now read amber instead of green. Maintenance parts tables were unchanged (same snapshot, just viewed at higher current hours)."},
   {v:"v0.63.0",d:"Flight log now follows the paper form's full-stop convention: when a waypoint is marked as a full-stop landing, it gets a blank separator row and is then repeated on a new line as the departure point for the next leg (turning points / overflies stay a single row; the final arrival isn't repeated since there's no next leg). Ticking/unticking a Full Stop box rebuilds the table live. Leg TRK/DIST still compute correctly across the split, the departure row stays locked (can't be a full-stop), and the qualifying-flight count still counts each landing once (the repeated departure rows have no checkbox)."},
