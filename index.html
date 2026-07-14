@@ -246,6 +246,20 @@
 
   .roadmap{display:flex; gap:0; overflow-x:auto; padding:var(--u3) var(--u1) var(--u5); margin-top:var(--u1); scroll-behavior:smooth}
   .mainttiles{display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:var(--u3); margin-top:var(--u3)}
+  /* Maintenance page suspension: toggled by MAINT_SUSPENDED in the script.
+     Content stays in the DOM (nothing torn down or deleted) but reads as
+     visibly not-live — greyed, desaturated, and blocked from interaction,
+     with a watermark stating it plainly. Deliberately reversible: flip
+     MAINT_SUSPENDED back to false to restore normal behaviour, no other
+     changes needed. */
+  .maint-suspended-wrap{position:relative}
+  .maint-suspended-wrap.is-suspended{filter:grayscale(1) brightness(.55); pointer-events:none; user-select:none}
+  .maint-watermark{position:absolute; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+    pointer-events:none}
+  .maint-watermark span{display:inline-block; padding:var(--u3) var(--u5); border:2px solid rgba(255,255,255,.5);
+    border-radius:var(--r2); background:rgba(10,13,20,.55); color:rgba(255,255,255,.65);
+    font-size:22px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+    transform:rotate(-8deg); white-space:nowrap}
   .maint-tile{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3);
     text-align:center; cursor:pointer; transition:.15s}
   .maint-tile:hover{border-color:var(--sky)}
@@ -587,6 +601,8 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 
     <section class="view" data-view="maintenance">
       <h1 class="title" style="margin-bottom:var(--u3)">Maintenance <span style="color:var(--faint); font-weight:700; font-size:14px">[PREVIEW]</span></h1>
+      <div id="maintContentWrap" class="maint-suspended-wrap">
+      <div class="maint-watermark" id="maintWatermark" style="display:none"><span>Not yet deployed</span></div>
       <div class="maint-checks">
         <div class="sopcheck">
           <div class="sop-spinner"></div>
@@ -642,6 +658,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       </div>
       <div class="subview" data-msub="booking" style="display:none">
         <div class="hint" style="margin-top:var(--u4)">Not included in this preview — no booking data was provided.</div>
+      </div>
       </div>
       </div>
     </section>
@@ -756,7 +773,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.66.0";
+const VERSION="v0.67.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -774,6 +791,14 @@ function goView(v){
 // Header stat labels below are BEST-GUESS interpretations of an ambiguous
 // plain-text scrape (FlightLogger's own UI wasn't inspected directly, just
 // this one export) — flagged inline, not presented as confirmed.
+// Maintenance page suspended (14 Jul 2026, at Nick's request) — greyed out
+// with a "Not yet deployed" watermark and interaction blocked, so it doesn't
+// read as further along than it actually is while employment terms/rate are
+// still being finalised with Kai. This is the ONLY flag to flip to bring it
+// back: set to false, and the page returns to full normal behaviour (live
+// FlightLogger fetch, clickable tiles, everything) with no other changes
+// needed anywhere else in the file.
+const MAINT_SUSPENDED=true;
 const MAINT_AIRCRAFT={
   reg:"VH-KAI", type:"DA40 IFR [LRT]", base:"YMMB",
   oilConsumption:"0.02 US qt/h",
@@ -1005,8 +1030,15 @@ function renderMaintTiles(){
     </div>`;
   }).join("");
 }
-renderMaintTiles();
-connectFlightLogger();
+
+if(MAINT_SUSPENDED){
+  $("#maintContentWrap").classList.add("is-suspended");
+  $("#maintWatermark").style.display="";
+  renderMaintTiles(); // static baseline only — connectFlightLogger() deliberately not called
+}else{
+  renderMaintTiles();
+  connectFlightLogger();
+}
 
 function fmtSecondsToHrs(sec){ return sec==null?null:(sec/3600).toFixed(1); }
 
@@ -1052,6 +1084,7 @@ async function showLiveOnlyDetail(reg){
 }
 
 $("#maintTiles").addEventListener("click",e=>{
+  if(MAINT_SUSPENDED) return; // belt-and-braces beyond the CSS pointer-events block
   const t=e.target.closest(".maint-tile"); if(!t||t.classList.contains("disabled-tile")) return;
   document.querySelectorAll(".maint-tile").forEach(x=>x.classList.toggle("active-tile",x===t));
   const reg=t.dataset.reg;
@@ -1305,6 +1338,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.67.0",d:"Maintenance page suspended at Nick's request — greyed out (desaturated + dimmed) with a 'Not yet deployed' watermark, and interaction fully blocked (tile clicks do nothing, both via CSS pointer-events and a JS guard). The live FlightLogger fetch is not called at all while suspended — no network request happens, not just a hidden result. Nothing was removed or torn down: all content, live-wiring, and the full fleet grid from the last two rounds are intact underneath, controlled by a single MAINT_SUSPENDED flag. Flip it back to false to fully restore normal behaviour with no other changes needed anywhere in the file."},
   {v:"v0.66.0",d:"Maintenance fleet grid now shows every real aircraft FlightLogger returns (28, up from the fixed 9), not just the ones already known about — any VH-registered aircraft in the live data gets a tile automatically. Non-aircraft entries (ALSIM simulators, Standby placeholders, GRD/Reserve) are deliberately excluded. Only DA40s have a traced planform diagram, so non-DA40 types (C172, PA44, SLG2 glider, 8KCAB, DA42) now show a plain tinted square placeholder instead — clicking any of them still gives full live detail (model, landings, fuel, current warning), the diagram is just a stand-in until real artwork exists for those types."},
   {v:"v0.65.0",d:"Maintenance page now connects to live FlightLogger data via the proxy Worker (see /ltfos-proxy). The 'Aircraft Maintenance Data' checker shows real [LIVE]/[FETCH FAILED] status instead of the permanent demo failure. Every aircraft the API returns is now a clickable tile — not just VH-KAI — colored by whether it has an open maintenance warning; clicking any of them fetches and shows its real warning, total landings, and total fuel, clearly marked [LIVE]. VH-KAI keeps its full existing static panel (gauge, header stats, current/previous parts tables) untouched, with the real live warning layered on underneath. Known gap: FlightLogger's maintenanceParts records return null for every part regardless of query (a permission boundary on the connected account's role, not a bug — needs a token with elevated maintenance-parts visibility), so the parts tables stay as the last-synced static snapshot for now. Degrades cleanly if the proxy is unreachable — VH-KAI's static data keeps working, other tiles correctly stay disabled rather than showing broken data."},
   {v:"v0.64.0",d:"Updated VH-KAI to the latest FlightLogger export: TTAF 2583.8, Tach 8404.6, Hobbs 8399.6 (up ~4.8hr since the previous figures). The aircraft has now passed the nominal 50-hour point (8403.3) and sits inside its ±5 tolerance band, and is 48.7hr from the 100-hour/annual — under 50 — so the 100-hour gauge (and the VH-KAI fleet tile) now read amber instead of green. Maintenance parts tables were unchanged (same snapshot, just viewed at higher current hours)."},
