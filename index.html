@@ -593,10 +593,10 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
           <span class="sop-label">Aircraft Maintenance Status</span>
           <span class="sop-warning"><span class="sop-prefix">[FETCH FAILED]</span> — Google Drive API not connected — MR/unserviceability status not live.</span>
         </div>
-        <div class="sopcheck">
+        <div class="sopcheck" id="flCheckRow">
           <div class="sop-spinner"></div>
           <span class="sop-label">Aircraft Maintenance Data</span>
-          <span class="sop-warning"><span class="sop-prefix">[FETCH FAILED]</span> — FlightLogger integration not connected — maintenance parts/records not live.</span>
+          <span class="sop-warning" id="flCheckWarning"><span class="sop-prefix">[FETCH FAILED]</span> — FlightLogger integration not connected — maintenance parts/records not live.</span>
         </div>
         <div class="sopcheck">
           <div class="sop-spinner"></div>
@@ -756,7 +756,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.64.0";
+const VERSION="v0.65.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -885,15 +885,23 @@ const fillColor=remaining>50?"var(--green)":"var(--amber)";
 const fiftyMarkPct=(MAINT_50HR_DUE-cycleStart); // where the 50hr checkpoint sits within the 0-100 cycle
 const tolPct=MAINT_TOL; // +/- band width in the same 0-100 units (1 unit = 1 hour)
 let _tileClipN=0;
-function tilePlanformSVG(active){
-  // Mini version of the 100-hour gauge planform. For the aircraft we have data
-  // for, it shows the same bottom-up status fill as the large gauge (green/amber
-  // to the remaining-hours level, clipped to the silhouette) so the tile carries
-  // the same at-a-glance status. For aircraft with no data, just a faint grey
-  // silhouette (and the tile itself stays greyed-out / disabled).
-  if(!active){
+function tilePlanformSVG(mode, color){
+  // Mini version of the 100-hour gauge planform, three modes:
+  //  'empty' — no data at all (faint grey silhouette, tile stays disabled)
+  //  'gauge' — VH-KAI only: the real percentage-fill gauge using the tuned
+  //            MAINT_100HR_DUE/MAINT_CURRENT_HRS figures (unchanged from before)
+  //  'flat'  — live FlightLogger aircraft where we only know "has an open
+  //            warning: yes/no" from worstMaintenanceWarning, not a precise
+  //            hours-remaining percentage — a solid tint conveys status
+  //            without implying precision we don't have
+  if(mode==="empty"){
     return `<svg viewBox="0 0 ${PW} ${PH}" style="width:100%; height:38px; display:block; margin:0 auto var(--u2)">
       <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="rgba(255,255,255,.14)"/>
+    </svg>`;
+  }
+  if(mode==="flat"){
+    return `<svg viewBox="0 0 ${PW} ${PH}" style="width:100%; height:38px; display:block; margin:0 auto var(--u2)">
+      <path transform="${PLANFORM_TRANSFORM}" d="${PLANFORM_PATH}" fill="${color}" opacity=".55"/>
     </svg>`;
   }
   const cid="tileClip"+(_tileClipN++); // unique clip id per tile so multiple can coexist
@@ -904,19 +912,146 @@ function tilePlanformSVG(active){
     <rect clip-path="url(#${cid})" x="0" y="${fillTopY.toFixed(1)}" width="${PW}" height="${(PH-fillTopY).toFixed(1)}" fill="${fillColor}" opacity=".9"/>
   </svg>`;
 }
-$("#maintTiles").innerHTML=MAINT_KNOWN_AIRCRAFT.map(a=>{
-  const has=a.reg===MAINT_AIRCRAFT.reg;
-  return `<div class="maint-tile${has?'':' disabled-tile'}" data-reg="${a.reg}">
-    ${tilePlanformSVG(has)}
-    <div class="reg">${a.reg}</div>
-    <div class="type">${has?a.type:'No maintenance data'}</div>
-  </div>`;
-}).join("");
+// ---- Live FlightLogger connection ----------------------------------------
+// Talks to the thin Cloudflare Worker proxy (see /ltfos-proxy project) which
+// holds the FlightLogger API token server-side — the token never reaches
+// this file or the browser. Two endpoints:
+//   GET /fleet                -> summary for every aircraft
+//   GET /aircraft/:callSign   -> full detail for one aircraft
+// Deployed & proven working 14 Jul 2026. KNOWN LIMITATION: the detail
+// endpoint's maintenanceParts always come back null for every record — a
+// FlightLogger role/permission boundary on this token, confirmed by testing
+// (not a bug in this app or the proxy). So VH-KAI's current/previous parts
+// tables below stay as the last-synced static snapshot until that's granted;
+// everything else wired up here (fleet-wide status, worstMaintenanceWarning,
+// nextService) is genuinely live.
+const FLIGHTLOGGER_PROXY="https://ltfos-flightlogger-proxy.ltfos.workers.dev";
+let flFleetData={}; // callSign -> live summary, populated once /fleet succeeds
+let flFleetLoaded=false;
+let flDetailCache={}; // callSign -> live detail, cached per session once fetched
+
+async function connectFlightLogger(){
+  const warn=$("#flCheckWarning"), row=$("#flCheckRow"), spinner=row.querySelector(".sop-spinner");
+  try{
+    const res=await fetch(`${FLIGHTLOGGER_PROXY}/fleet`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const fleet=await res.json();
+    flFleetData={};
+    fleet.forEach(a=>{ flFleetData[a.callSign]=a; });
+    flFleetLoaded=true;
+    spinner.classList.add("ok");
+    warn.classList.add("ok");
+    warn.innerHTML=`<span class="sop-prefix">[LIVE]</span> — connected to FlightLogger — ${fleet.length} aircraft synced.`;
+  }catch(err){
+    console.error("FlightLogger fleet fetch failed:",err);
+    warn.innerHTML=`<span class="sop-prefix">[FETCH FAILED]</span> — could not reach the FlightLogger proxy — showing static/demo status only.`;
+  }
+  renderMaintTiles();
+}
+
+function renderMaintTiles(){
+  $("#maintTiles").innerHTML=MAINT_KNOWN_AIRCRAFT.map(a=>{
+    const isKai=a.reg===MAINT_AIRCRAFT.reg;
+    const live=flFleetData[a.reg];
+    const clickable=isKai||!!live;
+    let svg, typeLine;
+    if(isKai){
+      svg=tilePlanformSVG("gauge");
+      typeLine=a.type;
+    }else if(live){
+      const hasWarning=!!live.worstMaintenanceWarning;
+      svg=tilePlanformSVG("flat", hasWarning?"var(--amber)":"var(--green)");
+      typeLine=hasWarning?live.worstMaintenanceWarning.subjectName:"No open warnings (live)";
+    }else{
+      svg=tilePlanformSVG("empty");
+      typeLine=flFleetLoaded?"Not found in FlightLogger":"No maintenance data";
+    }
+    return `<div class="maint-tile${clickable?'':' disabled-tile'}" data-reg="${a.reg}">
+      ${svg}
+      <div class="reg">${a.reg}</div>
+      <div class="type">${typeLine}</div>
+    </div>`;
+  }).join("");
+}
+renderMaintTiles();
+connectFlightLogger();
+
+function fmtSecondsToHrs(sec){ return sec==null?null:(sec/3600).toFixed(1); }
+
+function renderLiveWarningBand(elId, warning){
+  // Shared live-warning display, used both on VH-KAI's existing panel (as an
+  // addition, not a replacement) and on the generic live-only panel for
+  // every other aircraft.
+  if(!warning){
+    $(elId).innerHTML=`<div class="hint" style="color:var(--green)">No open maintenance warnings (live, via FlightLogger).</div>`;
+    return;
+  }
+  const hrs=fmtSecondsToHrs(warning.timeLeft);
+  $(elId).innerHTML=`
+    <div class="hint" style="color:var(--amber); font-weight:700">${warning.subjectName}</div>
+    <div class="hint" style="margin-top:2px">${warning.status}${hrs?` · expires in ${hrs} hrs`:''}${warning.expiryDate?` · ${warning.expiryDate}`:''} <span style="color:var(--sky)">[LIVE]</span></div>`;
+}
+
+async function showLiveOnlyDetail(reg){
+  const panel=$("#maintDetail");
+  panel.querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div>`;
+  $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="margin:0">Loading live FlightLogger data…</div>`;
+  $("#maintSubtabs").style.display="none"; // no discrepancies/documents/booking data for these yet
+  try{
+    let detail=flDetailCache[reg];
+    if(!detail){
+      const res=await fetch(`${FLIGHTLOGGER_PROXY}/aircraft/${encodeURIComponent(reg)}`);
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      detail=await res.json();
+      flDetailCache[reg]=detail;
+    }
+    $("#maintAcHeader").innerHTML=`
+      <div style="display:flex; align-items:baseline; gap:var(--u4); flex-wrap:wrap">
+        <div style="font-size:20px; font-weight:800; color:var(--ink)">${detail.callSign}</div>
+        <div class="hint" style="margin:0">${detail.model}${detail.disabled?' · disabled in FlightLogger':''}</div>
+      </div>
+      <div class="hint" style="margin-top:var(--u2)">Total landings ${detail.totalLandings??'—'} · Total fuel ${detail.totalFuel??'—'} <span style="color:var(--sky)">[LIVE]</span></div>`;
+    renderLiveWarningBand("#maintGaugePanel", detail.worstMaintenanceWarning);
+    $("#maintGaugePanel").innerHTML+=`<div class="hint" style="margin-top:var(--u3)">This aircraft's detailed maintenance-parts records aren't available yet — the connected FlightLogger account can see warnings but not full parts history for aircraft outside VH-KAI. See VH-KAI for the full parts table (static snapshot).</div>`;
+  }catch(err){
+    console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
+    $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="color:var(--amber)">Live detail fetch failed — try again shortly.</div>`;
+  }
+}
+
 $("#maintTiles").addEventListener("click",e=>{
   const t=e.target.closest(".maint-tile"); if(!t||t.classList.contains("disabled-tile")) return;
   document.querySelectorAll(".maint-tile").forEach(x=>x.classList.toggle("active-tile",x===t));
+  const reg=t.dataset.reg;
   $("#maintDetail").style.display="block";
   $("#maintDetail").scrollIntoView({behavior:"smooth",block:"start"});
+  if(reg===MAINT_AIRCRAFT.reg){
+    // VH-KAI: restore the full rich static panel (header/gauge/parts tables/
+    // subtabs) exactly as before, then layer live warning data on top in its
+    // own clearly-marked band underneath the gauge.
+    $("#maintDetail").querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintLiveBand" style="margin-top:var(--u3)"></div>`;
+    $("#maintSubtabs").style.display="";
+    renderMaintAcHeader();
+    renderMaintGauge();
+    $("#maintLiveBand").innerHTML=`<div class="hint">Loading live FlightLogger warning…</div>`;
+    (async()=>{
+      try{
+        let detail=flDetailCache[reg];
+        if(!detail){
+          const res=await fetch(`${FLIGHTLOGGER_PROXY}/aircraft/${encodeURIComponent(reg)}`);
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
+          detail=await res.json();
+          flDetailCache[reg]=detail;
+        }
+        renderLiveWarningBand("#maintLiveBand", detail.worstMaintenanceWarning);
+      }catch(err){
+        console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
+        $("#maintLiveBand").innerHTML=`<div class="hint" style="color:var(--amber)">Live warning fetch failed — showing static data only above.</div>`;
+      }
+    })();
+  }else{
+    showLiveOnlyDetail(reg);
+  }
 });
 
 // 100-hour cycle gauge — real figures from MAINT_CURRENT, not invented:
@@ -1138,6 +1273,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.65.0",d:"Maintenance page now connects to live FlightLogger data via the proxy Worker (see /ltfos-proxy). The 'Aircraft Maintenance Data' checker shows real [LIVE]/[FETCH FAILED] status instead of the permanent demo failure. Every aircraft the API returns is now a clickable tile — not just VH-KAI — colored by whether it has an open maintenance warning; clicking any of them fetches and shows its real warning, total landings, and total fuel, clearly marked [LIVE]. VH-KAI keeps its full existing static panel (gauge, header stats, current/previous parts tables) untouched, with the real live warning layered on underneath. Known gap: FlightLogger's maintenanceParts records return null for every part regardless of query (a permission boundary on the connected account's role, not a bug — needs a token with elevated maintenance-parts visibility), so the parts tables stay as the last-synced static snapshot for now. Degrades cleanly if the proxy is unreachable — VH-KAI's static data keeps working, other tiles correctly stay disabled rather than showing broken data."},
   {v:"v0.64.0",d:"Updated VH-KAI to the latest FlightLogger export: TTAF 2583.8, Tach 8404.6, Hobbs 8399.6 (up ~4.8hr since the previous figures). The aircraft has now passed the nominal 50-hour point (8403.3) and sits inside its ±5 tolerance band, and is 48.7hr from the 100-hour/annual — under 50 — so the 100-hour gauge (and the VH-KAI fleet tile) now read amber instead of green. Maintenance parts tables were unchanged (same snapshot, just viewed at higher current hours)."},
   {v:"v0.63.0",d:"Flight log now follows the paper form's full-stop convention: when a waypoint is marked as a full-stop landing, it gets a blank separator row and is then repeated on a new line as the departure point for the next leg (turning points / overflies stay a single row; the final arrival isn't repeated since there's no next leg). Ticking/unticking a Full Stop box rebuilds the table live. Leg TRK/DIST still compute correctly across the split, the departure row stays locked (can't be a full-stop), and the qualifying-flight count still counts each landing once (the repeated departure rows have no checkbox)."},
   {v:"v0.62.0",d:"Two fixes. (1) Flight planning: the departure aerodrome (first row) is no longer marked as a full-stop landing by default — you take off from it, you don't land there. This also fixes a miscount on round-trip routes (YMMB→…→YMMB), where matching full-stops by code was ticking the departure YMMB as well as the arrival; the departure row is now always excluded, so the qualifying-flight full-stop count reflects actual landings. (2) Data integrity checkers: the Maintenance page's three checkers now use an aligned grid so the labels and the [FETCH FAILED] markers line up in columns down the page (matching how the Home page checkers were already aligned)."},
