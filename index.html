@@ -238,6 +238,25 @@
   .fltable tr.fl-sep td{height:10px; padding:0; background:transparent; border-left:none; border-right:none}
   .fltable tr.fl-redepart td{border-top:2px solid var(--line2)}
   .fltable tr.fl-redepart td:first-child{color:var(--sky)!important}
+  .mr-block{
+    --mr-red:#a5121a; --mr-red-dim:#c94b48; --mr-paper:#fffdf8; --mr-paper2:#faf3e4;
+    --mr-ink:#1a1a1a; --mr-line:#a5121a;
+    background:var(--mr-paper); border:2px solid var(--mr-red); border-radius:var(--r1); padding:var(--u4); margin-top:var(--u4);
+    box-shadow:0 4px 18px rgba(0,0,0,.35); color:var(--mr-ink)
+  }
+  .mr-part-label{font-family:var(--font-ui); font-weight:800; font-size:13px; letter-spacing:.02em; text-transform:none; color:var(--mr-red); margin-bottom:var(--u2); border-bottom:2px solid var(--mr-red); padding-bottom:var(--u1)}
+  .mr-block .hint{color:#5a5040}
+  .mr-header-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:var(--u3); margin-bottom:var(--u4)}
+  .mr-header-grid .f{display:flex; flex-direction:column; gap:2px}
+  .mr-header-grid label{font-size:9.5px; color:var(--mr-red); text-transform:uppercase; letter-spacing:.05em; font-weight:700}
+  .mr-header-grid input{background:var(--mr-paper2); border:1px solid var(--mr-red-dim); border-radius:2px; color:var(--mr-ink); padding:var(--u2); font-size:12.5px; font-family:var(--font-mono); font-weight:600}
+  .mr-header-grid input:focus{outline:none; border-color:var(--mr-red); box-shadow:0 0 0 2px rgba(165,18,26,.15)}
+  .mr-checkrow label{color:var(--mr-ink)!important}
+  .mr-table{background:var(--mr-paper)}
+  .mr-table th, .mr-table td{border:1px solid var(--mr-red-dim); font-size:11.5px; color:var(--mr-ink)}
+  .mr-table th{background:var(--mr-paper2); color:var(--mr-red); font-weight:800; text-transform:none; letter-spacing:0}
+  .mr-table td{height:30px}
+  .mr-table tr:nth-child(even) td{background:rgba(165,18,26,.03)}
   .maplegend{position:absolute; top:56px; right:var(--u6); font-size:10.5px; color:var(--dim);
     background:rgba(18,22,31,.92); padding:var(--u2) var(--u3); border-radius:var(--r1); line-height:1.8; border:1px solid var(--line)}
   .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle} /* point-scale exception */
@@ -710,7 +729,127 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       </nav>
 
       <div class="subview" data-msub="maint">
-        <div class="plabel" style="margin-top:var(--u4)">Requiring Approval</div>
+        <div class="plabel" style="margin-top:var(--u4)">Maintenance Release</div>
+        <div class="hint">CASA Civil Aviation Regulation 43 format, matching the paper Maintenance Release exactly — structure only, not yet populated with data. Informed by CAAP 43-01 v2.3.</div>
+        <div class="hint" style="margin-top:var(--u2)">A maintenance release stops being in force the moment any of these happens: an endorsement records the aircraft as not airworthy, the expiry date or hours are reached, a new release's inspection has begun, a Part 1 requirement wasn't completed by its due time, or a required airworthiness directive hasn't been actioned.</div>
+
+        <div class="mr-block">
+          <div class="mr-part-label">Part 1 — Maintenance Requirements <span id="mrPart1LiveTag" style="font-weight:600; font-size:11px; text-transform:none; letter-spacing:0"></span></div>
+          <div class="hint" style="margin-bottom:var(--u3)">Lists maintenance that will fall due during this release's validity period, and when. This section doesn't certify completion itself — once something's done, it's transferred to Part 2 or the aircraft log book and certified there, then this row is marked complied-with.</div>
+          <div class="mr-header-grid">
+            <div class="f"><label>Maintenance Release No.</label><input type="text" value="A347568"></div>
+            <div class="f"><label>Aircraft Type</label><input type="text" value="DA40"></div>
+            <div class="f"><label>Registration</label><input type="text" value="VH-XPP"></div>
+            <div class="f"><label>Expires (date)</label><input type="text" value="26/06/27"></div>
+            <div class="f"><label>Expires (hours)</label><input type="text" value="2075.2"></div>
+            <div class="f"><label>Issued by</label><input type="text" value="AIRFLITE PTY LTD App. No. CASA.COA.0072"></div>
+            <div class="f"><label>Signed</label><input type="text" placeholder="(illegible in source)"></div>
+            <div class="f"><label>Aircraft TTIS at issue</label><input type="text" value="1975.2"></div>
+            <div class="f"><label>Time</label><input type="text" value="11:00"></div>
+            <div class="f"><label>Date</label><input type="text" value="26/06/26"></div>
+            <div class="f"><label>Place</label><input type="text" value="YMMB"></div>
+            <div class="f"><label>AME licence/authority no.</label><input type="text" value="606346"></div>
+            <div class="f"><label>Operational Category</label><input type="text" value="PRIVATE / PART 142 OPERATION"></div>
+            <div class="f"><label>Schedules/System of Maintenance</label><input type="text" value="DA40-180 MAINTENANCE MANUAL AND CASA SCHEDULE 5 RADIO"></div>
+          </div>
+          <div class="mr-checkrow" style="display:flex; gap:var(--u5); margin:-var(--u2) 0 var(--u4); flex-wrap:wrap">
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" checked style="width:auto"> IFR</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" checked style="width:auto"> VFR Night</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" checked style="width:auto"> VFR Day</label>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="mr-table">
+              <thead>
+                <tr>
+                  <th>Item No.</th>
+                  <th>Maintenance Required</th>
+                  <th>Due at date/Aircraft TTIS</th>
+                  <th>Complied with, entered &amp; certified in logbook or Part 2 of MR</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="mrPart1Body">
+                <tr><td>1</td><td>DA40-180 Maintenance Check Flight</td><td>First Flight</td><td></td><td></td></tr>
+                <tr><td>2</td><td>Lycoming 50 Hour Engine Inspection</td><td>2025.2 &plusmn; 5 Hrs or 26 Oct 26</td><td></td><td></td></tr>
+                <tr><td>3</td><td>DA40-180 50 Airframe Inspection</td><td>2025.2 &plusmn; 5 Hrs</td><td></td><td></td></tr>
+                <tr><td>4</td><td>Powerflow Exhaust 50 Hour Inspection</td><td>2025.2 &plusmn; 5 Hrs</td><td></td><td></td></tr>
+                <tr><td>5</td><td>Lycoming MSB 650 Intake Pipe &amp; Flange Inspection</td><td>2025.2 &plusmn; 5 Hrs</td><td></td><td></td></tr>
+                <tr><td>6</td><td>AD/GENERAL/87 AMDT 1</td><td>03 Feb 27</td><td></td><td></td></tr>
+                <tr><td>7</td><td>AWB 26-008 Fire Extinguisher 12 Month Inspection</td><td>03 Feb 27</td><td></td><td></td></tr>
+                <tr><td>8</td><td>Powerflow Exhaust Annual/500 Hour Inspection</td><td>03 Feb 27</td><td></td><td></td></tr>
+                <tr><td>9</td><td>Autopilot Mechanical Check</td><td>03 Feb 27 &plusmn; 30 Days</td><td></td><td></td></tr>
+                <tr><td>10</td><td>Magnetic Compass Calibration</td><td>03 Feb 27 &plusmn; 30 Days</td><td></td><td></td></tr>
+                <tr><td>11</td><td>Main Battery Capacity Check</td><td>03 Feb 27 &plusmn; 1 Month</td><td></td><td></td></tr>
+                <tr><td>12</td><td>CAO 100.5 App 1 Cl 10 Emergency Exits</td><td>27 Mar 27 &plusmn; 30 Days</td><td></td><td></td></tr>
+                <tr><td>13</td><td>DA40-180 200 Hour Inspection</td><td>08 May 27 &plusmn; 30 Days</td><td></td><td></td></tr>
+                <tr><td>14</td><td>DA40-180 Time Limit &ndash; Replace Brake Fluid</td><td>21 May 27 &plusmn; 60 Days</td><td></td><td></td></tr>
+                <tr><td>15</td><td>DA40-180 Daily Inspection</td><td>Daily</td><td></td><td></td></tr>
+                <tr><td>16</td><td>Portable ELT to be carried</td><td>Daily</td><td></td><td></td></tr>
+                <tr><td>17</td><td>Oil uplifts to be recorded in Part 3 of this MR</td><td>Daily</td><td></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mr-block">
+          <div class="mr-part-label">Part 2 — Endorsements</div>
+          <div class="hint" style="margin-bottom:var(--u3)">Every defect found gets endorsed here, major or minor — the regulation doesn't distinguish, both must be recorded. A major defect (one that has caused or could cause a structural, control-system, engine, or fire failure) grounds the aircraft until it's rectified. A minor one may still allow flight if a pilot or LAME assesses it as not major and not required for the intended flight, with that assessment noted in the clearing column.</div>
+          <div style="overflow-x:auto">
+            <table class="mr-table">
+              <thead>
+                <tr>
+                  <th>Item No.</th>
+                  <th>Endorsements</th>
+                  <th>Date, signature and licence no.</th>
+                  <th>Item No.</th>
+                  <th>Clearing Endorsements</th>
+                  <th>Clearing signature, licence/authority no. and date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>1</td><td>Pilot side rudder pedals, RHS brake fluid leak</td><td></td><td>1</td><td>New pilot RH M/cylinder seals fitted, ref Airflite Maint 20-</td><td></td></tr>
+                <tr><td>2</td><td>RHS Position light U/S</td><td></td><td>&nbsp;</td><td></td><td></td></tr>
+                <tr><td>&nbsp;</td><td></td><td></td><td>&nbsp;</td><td></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mr-block">
+          <div class="mr-part-label">Part 3 — Daily Inspection Certifications and Aircraft Time-in-Service</div>
+          <div class="hint" style="margin-bottom:var(--u3)">Dual purpose: the daily inspection must be signed for before the first flight of the day, and the day's total flight time plus the aircraft's running progressive total must be entered after the last flight, before it flies again. Same log also carries oil uplifts and any cycle counts the type requires — landings, pressurisation, engine starts, and similar.</div>
+          <div style="overflow-x:auto">
+            <table class="mr-table">
+              <thead>
+                <tr>
+                  <th rowspan="2">Date</th>
+                  <th colspan="2">Daily Inspection Certification<br>(Pilot, LAME, MA)</th>
+                  <th colspan="4">Aircraft Time in Service</th>
+                  <th colspan="2">Cycle Totals, e.g. Landing/Start, Pressurisation</th>
+                </tr>
+                <tr>
+                  <th>Signature</th>
+                  <th>Licence No.</th>
+                  <th>Hrs</th>
+                  <th>Min</th>
+                  <th>Hrs</th>
+                  <th>Min</th>
+                  <th>L</th>
+                  <th>O/L</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="background:rgba(255,255,255,.03)"><td></td><td colspan="2" style="text-align:center; color:var(--faint)">Brought Forward:</td><td colspan="4"></td><td colspan="2"></td></tr>
+                <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="plabel" style="margin-top:var(--u6)">Requiring Approval</div>
         <div class="panel" id="maintApprovalPanel"></div>
 
         <div class="plabel" style="margin-top:var(--u5)">Current Maintenance Parts</div>
@@ -907,13 +1046,14 @@ function nm(a,b){const R=3440.065,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.l
 function trk(a,b){const dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;const y=Math.sin(dLon)*Math.cos(la2),x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);return ((Math.atan2(y,x)*180/Math.PI)+360)%360;}
 function inEnv(w,a){let ins=false;for(let i=0,j=ENV.length-1;i<ENV.length;j=i++){const xi=ENV[i].a,yi=ENV[i].w,xj=ENV[j].a,yj=ENV[j].w;const hit=((yi>w)!==(yj>w))&&(a<((xj-xi)*(w-yi))/(yj-yi)+xi);if(hit)ins=!ins;}return ins;}
 const $=s=>document.querySelector(s);
+
 const pad3=n=>String(Math.round(n)).padStart(3,"0");
 
 window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.72.0";
+const VERSION="v0.79.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -938,7 +1078,7 @@ function goView(v){
 // back: set to false, and the page returns to full normal behaviour (live
 // FlightLogger fetch, clickable tiles, everything) with no other changes
 // needed anywhere else in the file.
-const MAINT_SUSPENDED=true;
+const MAINT_SUSPENDED=false;
 const MAINT_AIRCRAFT={
   reg:"VH-KAI", type:"DA40 IFR [LRT]", base:"YMMB",
   oilConsumption:"0.02 US qt/h",
@@ -1196,6 +1336,51 @@ function renderLiveWarningBand(elId, warning){
     <div class="hint" style="margin-top:2px">${warning.status}${hrs?` · expires in ${hrs} hrs`:''}${warning.expiryDate?` · ${warning.expiryDate}`:''} <span style="color:var(--sky)">[LIVE]</span></div>`;
 }
 
+// Populates Part 1's Maintenance Release table from FlightLogger's real
+// maintenanceParts data. FlightLogger keeps the FULL history of a recurring
+// requirement (e.g. "50 HOUR" gets a new record roughly every 50 flight
+// hours as it's completed and rescheduled) — Part 1 on the paper form shows
+// what's currently due, not the whole history, so this dedupes down to the
+// most-recently-approved instance of each named requirement before
+// rendering. Note on "status": this is FlightLogger's own field, shown
+// verbatim (APPROVED/EXPIRED) rather than relabelled — "EXPIRED" here means
+// the nominal due-point has been passed, which is not automatically the
+// same as grounded (e.g. an item can be past its nominal point but still
+// inside its stated ± tolerance).
+function renderMrPart1FromLive(parts){
+  const tag=$("#mrPart1LiveTag");
+  if(!parts||!parts.length){
+    tag.innerHTML=` <span style="color:var(--amber)">— live fetch returned no maintenance parts, showing static template above</span>`;
+    return;
+  }
+  const byName={};
+  parts.forEach(p=>{
+    const existing=byName[p.name];
+    if(!existing||(p.approvedAt||"0000")>(existing.approvedAt||"0000")) byName[p.name]=p;
+  });
+  const current=Object.values(byName);
+  current.sort((a,b)=>{
+    const aKey=a.expirationDate||(a.expirationLogSeconds?"9999-"+String(9999999-a.expirationLogSeconds).padStart(10,"0"):"zzzz");
+    const bKey=b.expirationDate||(b.expirationLogSeconds?"9999-"+String(9999999-b.expirationLogSeconds).padStart(10,"0"):"zzzz");
+    return String(aKey).localeCompare(String(bKey));
+  });
+  $("#mrPart1Body").innerHTML=current.map((p,i)=>{
+    const dueDate=p.expirationDate?new Date(p.expirationDate).toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"numeric"}):null;
+    const dueHrs=p.expirationLogSeconds?(p.expirationLogSeconds/3600).toFixed(1)+" hrs":null;
+    const due=[dueDate,dueHrs].filter(Boolean).join(" / ")||"—";
+    const statusColor=p.status==="APPROVED"?"var(--green)":"var(--amber)";
+    const approvedDate=p.approvedAt?new Date(p.approvedAt).toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"numeric"}):"";
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${p.name}</td>
+      <td>${due}</td>
+      <td style="color:${statusColor}; font-weight:700">${p.status}</td>
+      <td>${approvedDate}</td>
+    </tr>`;
+  }).join("");
+  tag.innerHTML=` <span style="color:#0a7d3c">[LIVE] — ${current.length} current items from FlightLogger (deduped from ${parts.length} historical records)</span>`;
+}
+
 async function showLiveOnlyDetail(reg){
   const panel=$("#maintDetail");
   panel.querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div>`;
@@ -1249,9 +1434,11 @@ $("#maintTiles").addEventListener("click",e=>{
           flDetailCache[reg]=detail;
         }
         renderLiveWarningBand("#maintLiveBand", detail.worstMaintenanceWarning);
+        renderMrPart1FromLive(detail.maintenanceParts);
       }catch(err){
         console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
         $("#maintLiveBand").innerHTML=`<div class="hint" style="color:var(--amber)">Live warning fetch failed — showing static data only above.</div>`;
+        $("#mrPart1LiveTag").innerHTML=` <span style="color:var(--amber)">— live fetch failed, showing static template above</span>`;
       }
     })();
   }else{
@@ -1478,6 +1665,13 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.79.0",d:"Part 1 of the Maintenance Release now populates from real, live FlightLogger data — the maintenanceParts permission wall from earlier in the project is gone with the new API key. FlightLogger keeps the full history of every recurring requirement (e.g. '50 HOUR' gets a new record roughly every 50 flight hours as it's completed and rescheduled), so this dedupes down to the current instance of each named item before rendering — confirmed against VH-KAI's real data: LYCOMING 50 HOUR/DIAMOND 50 HOUR/etc. all correctly show 8403.3 hrs, 100 HOUR/ANNUAL shows 8453.3 hrs, both matching figures already verified earlier in this project. Status (APPROVED/EXPIRED) shown as FlightLogger states it, not relabelled — 'EXPIRED' here means the nominal due-point has passed, which isn't automatically the same as grounded. Degrades cleanly: if the live fetch fails, the static 17-item template stays exactly as it was, with a note explaining why. Part 2 (endorsements) and Part 3 (daily log) are unchanged — those are CASA-paper-specific concepts with no equivalent in FlightLogger's data model, confirmed by reviewing its full field list; not a permission gap, a genuine domain mismatch."},
+  {v:"v0.78.0",d:"Maintenance Release template restyled to emulate the real CASA form's look — off-white paper background, red rules/borders, red section headers, matching the government form's printed aesthetic instead of the app's dark theme (deliberate scoped exception, same pattern as YMMB's own visual identity). Also populated the values that were clearly legible/printed in the photographed VH-XPP document: all 14 Part 1 header fields except 'Signed' (that specific signature was illegible, left blank rather than guessed), all three IFR/VFR Night/VFR Day boxes ticked (matching the original), the full 17-item Part 1 maintenance-requirements table, and Part 2's two endorsement descriptions (text only — signature/licence/date columns left blank since those specific handwritten entries weren't clearly legible). Part 3 (the daily inspection log) stays an empty template — that section had the most illegible handwriting in the source photos, so nothing was transcribed there rather than risk guessing at a compliance record."},
+  {v:"v0.77.0",d:"Maintenance page unlocked — MAINT_SUSPENDED flipped to false. Watermark and grey-out are gone, live FlightLogger fetch runs again (fleet status, real per-aircraft warnings), all tiles clickable, everything from the suspension round restored to normal exactly as designed — single flag, no other changes needed."},
+  {v:"v0.76.0",d:"Removed the front-page login gate added last round — front page loads straight into the normal splash/app sequence again, no password step. All of it gone: the HTML overlay, its CSS, and the JS that checked the password."},
+  {v:"v0.75.0",d:"Added a simple password gate on the front page — a full-screen overlay with a password field (native browser masking, shows dots) that must be cleared before the app loads. Password is 'sesame'. Worth being upfront: this is a casual keep-out gate for a work-in-progress prototype, not real security — it's a static file, so the password is visible to anyone who views the page source. Wrong password shows an inline error and clears the field; correct password (Enter key or the button) dismisses the gate and the app loads normally underneath, splash sequence and all."},
+  {v:"v0.74.0",d:"Refined the Maintenance Release template against CAAP 43-01 v2.3 (CASA's own advisory on how the form is meant to be used). Added the 'Signed' field to Part 1's header (distinct from 'Issued by' — matches both the real photographed form and the CAAP's description) and the IFR/VFR Night/VFR Day tickboxes. Added short paraphrased explanatory notes — what Part 1 actually certifies (nothing itself; it lists what's due), the major/minor defect distinction in Part 2, Part 3's dual daily-inspection/time-in-service purpose, and the conditions under which the whole release stops being valid. Still structure only — no data populated, still fully inside the suspended Maintenance page."},
+  {v:"v0.73.0",d:"Added the real CASA Civil Aviation Regulation 43 Maintenance Release format to the Maintenance page — Part 1 (Maintenance Requirements: header fields + due-date table), Part 2 (Endorsements: discrepancies raised and cleared), Part 3 (Daily Inspection Certifications and Aircraft Time-in-Service, matching the paper log's nested-header layout exactly — Date / Signature / Licence No. / Flight Time / Progressive Total / Cycle Totals). Structure only, no data populated yet, per request — none of the handwritten entries from the reference photos were transcribed, since several were genuinely illegible and this is a real airworthiness compliance format, not something to guess at. Sits above the existing FlightLogger-derived tables (Requiring Approval / Current / Previous Parts), which are untouched. Still fully within the suspended Maintenance page — greyed out and watermarked same as everything else there."},
   {v:"v0.72.0",d:"YMMB reordered to Weather / Fleet Status / Bookings / Notices. Fleet Status is now a real panel (not a 'coming soon' teaser): leads with the operational percentage, then the count, then a breakdown by aircraft type (DA40/C172/SLG2/PA44/8KCAB/DA42). Figures are a real snapshot from the FlightLogger proxy testing earlier in the project — 27 real aircraft, same VH- filter as the Maintenance page's fleet grid (simulators/standby/ground-reserve excluded) — stamped 'as of' the same way weather is, since it's a snapshot, not a live feed. 'Operational' is deliberately kept separate from 'has an open maintenance item' — a routine upcoming check isn't the same as being grounded, so the two aren't conflated into one number. 'Today's Flying' renamed to 'Bookings', still a coming-soon teaser."},
   {v:"v0.71.0",d:"Fixed the YMMB hero title reading as one squished-together word ('YourMorningManagementBrief') in its expanded state — the inter-word gap was capped too tight (max-width:.32em, which the space glyph could get clipped inside). Switched to an explicit, more generous width (.55em) that still collapses cleanly to 0 when it animates into 'YMMB'. Verified: consistent ~20px visible gaps between words while expanded, and the collapse still converges the Y/M/M/B letters tightly together same as before."},
   {v:"v0.70.0",d:"YMMB hero title now holds for 4.1s (was 1.1s) before collapsing into 'YMMB' — more time to actually read the full phrase before it animates."},
