@@ -1053,7 +1053,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.79.0";
+const VERSION="v0.80.0";
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   goView(b.dataset.v);
@@ -1078,7 +1078,7 @@ function goView(v){
 // back: set to false, and the page returns to full normal behaviour (live
 // FlightLogger fetch, clickable tiles, everything) with no other changes
 // needed anywhere else in the file.
-const MAINT_SUSPENDED=false;
+const MAINT_SUSPENDED=true;
 const MAINT_AIRCRAFT={
   reg:"VH-KAI", type:"DA40 IFR [LRT]", base:"YMMB",
   oilConsumption:"0.02 US qt/h",
@@ -1665,6 +1665,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.80.0",d:"Maintenance page re-suspended — MAINT_SUSPENDED flipped back to true. Watermark and grey-out are back, live fetches stop (including Part 1's live maintenanceParts data from last round — falls back to its static 17-item template cleanly, no errors), tiles unclickable again. Same single flag as always."},
   {v:"v0.79.0",d:"Part 1 of the Maintenance Release now populates from real, live FlightLogger data — the maintenanceParts permission wall from earlier in the project is gone with the new API key. FlightLogger keeps the full history of every recurring requirement (e.g. '50 HOUR' gets a new record roughly every 50 flight hours as it's completed and rescheduled), so this dedupes down to the current instance of each named item before rendering — confirmed against VH-KAI's real data: LYCOMING 50 HOUR/DIAMOND 50 HOUR/etc. all correctly show 8403.3 hrs, 100 HOUR/ANNUAL shows 8453.3 hrs, both matching figures already verified earlier in this project. Status (APPROVED/EXPIRED) shown as FlightLogger states it, not relabelled — 'EXPIRED' here means the nominal due-point has passed, which isn't automatically the same as grounded. Degrades cleanly: if the live fetch fails, the static 17-item template stays exactly as it was, with a note explaining why. Part 2 (endorsements) and Part 3 (daily log) are unchanged — those are CASA-paper-specific concepts with no equivalent in FlightLogger's data model, confirmed by reviewing its full field list; not a permission gap, a genuine domain mismatch."},
   {v:"v0.78.0",d:"Maintenance Release template restyled to emulate the real CASA form's look — off-white paper background, red rules/borders, red section headers, matching the government form's printed aesthetic instead of the app's dark theme (deliberate scoped exception, same pattern as YMMB's own visual identity). Also populated the values that were clearly legible/printed in the photographed VH-XPP document: all 14 Part 1 header fields except 'Signed' (that specific signature was illegible, left blank rather than guessed), all three IFR/VFR Night/VFR Day boxes ticked (matching the original), the full 17-item Part 1 maintenance-requirements table, and Part 2's two endorsement descriptions (text only — signature/licence/date columns left blank since those specific handwritten entries weren't clearly legible). Part 3 (the daily inspection log) stays an empty template — that section had the most illegible handwriting in the source photos, so nothing was transcribed there rather than risk guessing at a compliance record."},
   {v:"v0.77.0",d:"Maintenance page unlocked — MAINT_SUSPENDED flipped to false. Watermark and grey-out are gone, live FlightLogger fetch runs again (fleet status, real per-aircraft warnings), all tiles clickable, everything from the suspension round restored to normal exactly as designed — single flag, no other changes needed."},
