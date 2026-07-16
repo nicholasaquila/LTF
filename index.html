@@ -1644,25 +1644,35 @@ const SCHED_SAMPLE_AIRCRAFT=[
 // Instructor Weekly" per its own header), not a one-time export, so this
 // is as-of-this-date, not permanently current. Re-paste to refresh.
 //
-// Two known gaps, not silently resolved:
-// 1. Instructor labels ("2N.Carpeggiani", "G2 - Kieran") are stored EXACTLY
-//    as given — the source itself mixes two different formats (FlightLogger-
-//    style short code vs "grade - first name"), and neither has been
-//    matched against a real FlightLogger User record yet (User's real
-//    fields are still pending from the round-100/101 introspection).
-//    Shown for context only — NOT used to check real instructor conflicts.
-// 2. aircraftTypesNeeded is an array, not a single type, because the source
-//    just says "C172" generically — doesn't specify R or S. Treated as
-//    "either is fine" rather than guessing one, since the source genuinely
-//    doesn't disambiguate.
+// Instructor/student labels now resolved to real FlightLogger user IDs
+// (round 103) — confirmed via the /users endpoint's full 316-user list, not
+// guessed. Every name in the mastersheet matched cleanly on firstName (and
+// grade-prefix consistency for the "G2 - Firstname" style labels — e.g.
+// "G2 - Kieran" matched callSign "2K.Corrigan", firstName "Kieran": the "2"
+// grade prefix and first name both line up). Real IDs:
+//   Nick Carpeggiani: 118606 (callSign 2N.Carpeggiani — exact string match,
+//     no ambiguity at all)
+//   Zane Walker: 125042 | Kwong Chun (Harold) Leung: 125049
+//   Aaron D'Cruz: 126447 | Hon To (Tony) Ma: 113214
+//   Edwin Pallikunnath-Shoby: 113139 | Matthew Rogers: 116055
+//   Kieran Corrigan: 118468 | Juntong Wei: 126041
+//   Alex Chen: 112960 | Ian Mowat: 112963 | Alexander Aridas: 125324
+// "TBC" secondary instructors are genuinely TBC in the source — left as the
+// string "TBC", not resolved to an ID, since there's no real person to
+// resolve to yet.
+//
+// One gap left, not silently resolved: aircraftTypesNeeded is still an
+// array, not a single type — the source says "C172" generically, doesn't
+// specify R or S, and FlightLogger's own Program.aircraftType enum (checked
+// round 102) turned out too coarse to help (just HELICOPTER/AIRPLANE).
 const REAL_STUDENTS_ASOF="16 Jul 2026";
 const REAL_STUDENTS=[
-  {id:"rs1",name:"Walker, Zane",program:"RPL",aircraftTypesNeeded:["DA40"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"G2 - Kieran",availableDays:["Sat","Sun"],totalHours:35.2,howOften:"1 - 3 times a month"},
-  {id:"rs2",name:"Leung, Kwong Chun (Harold)",program:"CPL1",aircraftTypesNeeded:["DA40"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"TBC",availableDays:["Sun","Sat","Tue"],totalHours:28,howOften:"1 - 2 times a week"},
-  {id:"rs3",name:"D'Cruz, Aaron",program:"RPL",aircraftTypesNeeded:["SLG2"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"G3 - Juntong",availableDays:["Sun","Sat"],totalHours:18.9,howOften:"1 - 3 times a month"},
-  {id:"rs4",name:"Ma, Hon To (Tony)",program:"PPL",aircraftTypesNeeded:["C172R","C172S"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"TBC",availableDays:["Tue","Wed","Thu","Fri","Sat"],totalHours:27,howOften:"1 - 3 times a month"},
-  {id:"rs5",name:"Pallikunnath-Shoby, Edwin",program:"RPL",aircraftTypesNeeded:["C172R","C172S"],primaryInstructor:"G2 - Alex C",secondaryInstructor:"2N.Carpeggiani",availableDays:["Tue"],totalHours:21.5,howOften:"1 - 2 times a week"},
-  {id:"rs6",name:"Rogers, Matthew",program:"RPL",aircraftTypesNeeded:["SLG2"],primaryInstructor:"G2 - Ian",secondaryInstructor:"G3 - Alex A",availableDays:[],totalHours:33.9,howOften:null,note:"Awaiting availability from student"},
+  {id:"rs1",name:"Walker, Zane",userId:"125042",program:"RPL",aircraftTypesNeeded:["DA40"],primaryInstructor:"2N.Carpeggiani",primaryInstructorId:"118606",secondaryInstructor:"G2 - Kieran",secondaryInstructorId:"118468",availableDays:["Sat","Sun"],totalHours:35.2,howOften:"1 - 3 times a month"},
+  {id:"rs2",name:"Leung, Kwong Chun (Harold)",userId:"125049",program:"CPL1",aircraftTypesNeeded:["DA40"],primaryInstructor:"2N.Carpeggiani",primaryInstructorId:"118606",secondaryInstructor:"TBC",secondaryInstructorId:null,availableDays:["Sun","Sat","Tue"],totalHours:28,howOften:"1 - 2 times a week"},
+  {id:"rs3",name:"D'Cruz, Aaron",userId:"126447",program:"RPL",aircraftTypesNeeded:["SLG2"],primaryInstructor:"2N.Carpeggiani",primaryInstructorId:"118606",secondaryInstructor:"G3 - Juntong",secondaryInstructorId:"126041",availableDays:["Sun","Sat"],totalHours:18.9,howOften:"1 - 3 times a month"},
+  {id:"rs4",name:"Ma, Hon To (Tony)",userId:"113214",program:"PPL",aircraftTypesNeeded:["C172R","C172S"],primaryInstructor:"2N.Carpeggiani",primaryInstructorId:"118606",secondaryInstructor:"TBC",secondaryInstructorId:null,availableDays:["Tue","Wed","Thu","Fri","Sat"],totalHours:27,howOften:"1 - 3 times a month"},
+  {id:"rs5",name:"Pallikunnath-Shoby, Edwin",userId:"113139",program:"RPL",aircraftTypesNeeded:["C172R","C172S"],primaryInstructor:"G2 - Alex C",primaryInstructorId:"112960",secondaryInstructor:"2N.Carpeggiani",secondaryInstructorId:"118606",availableDays:["Tue"],totalHours:21.5,howOften:"1 - 2 times a week"},
+  {id:"rs6",name:"Rogers, Matthew",userId:"116055",program:"RPL",aircraftTypesNeeded:["SLG2"],primaryInstructor:"G2 - Ian",primaryInstructorId:"112963",secondaryInstructor:"G3 - Alex A",secondaryInstructorId:"125324",availableDays:[],totalHours:33.9,howOften:null,note:"Awaiting availability from student"},
 ];
 
 // Fixed operating assumptions, per explicit instruction (round 101) — not
@@ -1706,10 +1716,11 @@ function generateRealSuggestions(students,realAircraftBookingsByReg){
         if(!slot) continue;
         const slotEnd=minutesToTime(timeToMinutes(slot.start)+SCHED_LESSON_MINUTES);
         suggestions.push({
-          studentId:student.id, studentName:student.name,
-          primaryInstructor:student.primaryInstructor, secondaryInstructor:student.secondaryInstructor,
+          studentId:student.id, studentName:student.name, studentUserId:student.userId,
+          primaryInstructor:student.primaryInstructor, primaryInstructorId:student.primaryInstructorId,
+          secondaryInstructor:student.secondaryInstructor, secondaryInstructorId:student.secondaryInstructorId,
           aircraftReg:ac.reg, date, start:slot.start, end:slotEnd,
-          instructorVerified:false,
+          instructorVerified:false, // identity resolved (real ID), schedule still not checked against real DutyTime/bookings
         });
         break; // one suggestion per date is enough — don't enumerate every tail
       }
@@ -1808,7 +1819,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.93.0";
+const VERSION="v0.94.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2448,6 +2459,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.94.0",d:"Every real ID needed for a real booking write is now confirmed — not guessed. Chased down a genuine mystery this round: SingleStudentBookingInput kept coming back with no inputFields at all across several retries, which turned out to be three completely different causes in sequence (an old code path missing the fix, a wrong deploy folder, and — once actually fixed — the real complete shape came through: bookingStart/End, flightStart/End, aircraftId, instructorById, and a nested studentById{userId}). Built /users properly after a first attempt silently capped at ~48 real accounts — added real cursor pagination (confirmed via pageInfo, following the same Connection pattern every other type in this schema already uses), which pulled the true count (316 users, 7 pages) and found every single person actually needed: Nick, all 6 real students, and all 5 relevant instructors, matched cleanly by name and confirmed against real FlightLogger IDs, not assumed. REAL_STUDENTS now carries verified userId/instructorId fields end to end into every suggestion. The actual write endpoint (POST /create-booking) is built and deployed — resolves aircraft callSign to a real ID server-side, constructs the verified input shape, calls the real mutation, returns the real result. Also fixed two real bugs found along the way: the proxy's CORS headers only allowed GET requests, which would have silently blocked this exact endpoint from a browser; and the file's own header comment still claimed 'read-only', which stopped being true. Deliberately NOT wired to the Confirm button yet — the endpoint is real and ready, but firing the very first real write against a real student's schedule needs an agreed safe-testing approach first, which is still an open question."},
   {v:"v0.93.0",d:"Scheduling module: real students, real aircraft-conflict checking, real Confirm-button flow — genuine progress, not just UI. Added a new permanent proxy endpoint (/bookings-range) returning real bookings for aircraft-conflict checking, live-tested with a mocked conflict scenario that proved the engine correctly falls through to a different tail when the first one's fully booked. 6 real students imported from the actual mastersheet (dated 16 Jul 2026) — day-of-week availability, not time windows, which needed a genuine engine redesign, not just a data swap: fixed 08:00-17:00 duty window and fixed 2-hour lessons, both per explicit instruction, real instructor duty times not wired yet. Matthew Rogers (no availability data in the source) correctly produces zero suggestions rather than a guess. Two known gaps recorded rather than papered over: instructor conflicts aren't checked against live data yet (every real suggestion says so plainly), and 'C172' in the source doesn't specify R or S, so it's treated as either rather than guessed. The Confirm button is real and honest, not a stub: on sample data it demonstrates the full click-to-confirm flow; on real data it explicitly refuses to fire a guessed mutation and says exactly why — SingleStudentBookingInput's real shape still isn't confirmed, and a wrong guess there risks creating a malformed real booking, a different order of risk than a bad read query. Also shipped this round: the proxy's SingleStudentBookingInput/User/Program/ProgramRevision introspection, for whenever that schema check comes back."},
   {v:"v0.92.0",d:"New Scheduling tab — groundwork for the student/instructor/aircraft auto-matching module (separate, broader than the existing Circuit Booking roadmap item). The actual matching engine is real and tested, not just scaffolding: time-overlap detection, booking subtraction (splits an available window around existing bookings), instructor daily-flight limits, per-instructor custom rules, and a minimum-lesson-duration filter — 11 unit tests, all passing, run in isolation with Node before any of it went into the app. One genuine design question the tests surfaced and answered: rules evaluate the whole candidate window as a single slot rather than trimming it to fit — a window that starts too early gets rejected outright, not silently shifted to a time the tool invented. Suggest-only, as agreed: nothing in this module writes to FlightLogger or creates a real booking — that's explicitly a separate, later step needing its own schema-verification round first. Added a 'Preview with sample data' button so the working engine is visible now, clearly labelled [SAMPLE] throughout and easy to clear — not a stand-in for real data, just proof the logic works before real student/instructor data arrives. Gated behind the same 6-click mechanism as every other non-Home/Solo-Signout tab."},
   {v:"v0.91.0",d:"Aircraft selection now stays in sync between W&B and Fuel Plan — pick a tail in either one, the other reflects it immediately, including its actual computed state (not just the dropdown), even before switching to that page. Guarded the same way the existing fuel-litres sync already was, so there's no risk of a feedback loop between the two. Nav Map: C172 routes now default each leg's TAS to N0110 (110kn), Sling 2 routes (once any exist — none do yet) will default to N0100 (100kn) — both stated directly, not found in the LTF SOP's own airspeeds section, which was checked first as instructed but only lists VNE/VNO/VA/VFE limit speeds, no cruise TAS figure for either type. Worth noting: Sling 2's VNO is 110kn per that SOP — genuinely a different figure from its 100kn cruise TAS, not interchangeable with it."},
