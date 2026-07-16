@@ -1298,8 +1298,8 @@ const AIRCRAFT_TYPES={
     seatingLayout:"side-by-side",
     stations:[
       {id:"occupants",label:"Pilot & Passenger",arm:1959,default:150},
-      {id:"bagFront", label:"Baggage (Front)",   arm:2508,default:0,limit:null},
-      {id:"bagRear",  label:"Baggage (Rear)",    arm:2896,default:0,limit:null},
+      {id:"bagFront", label:"Baggage (Front)",   arm:2508,default:0,limit:35}, // round 96, matches this station's existing arm exactly
+      {id:"bagRear",  label:"Baggage (Rear)",    arm:2896,default:0,limit:25}, // round 96, matches this station's existing arm exactly
     ],
     fuel:{arm:1511,kgPerL:null},
     categories:{
@@ -1449,26 +1449,46 @@ const FLEET=[
   // here since two of LTF's own documents confirm it, but this is worth
   // checking — possibly sold/retired before that live pull, or a timing
   // gap, not necessarily an error in either source.
-  {reg:"VH-SYH",type:"C172R",bew:752.0,arm:992.0,  maxFuelL:null},
-  {reg:"VH-LWX",type:"C172R",bew:756.6,arm:991.0,  maxFuelL:null},
-  {reg:"VH-LXA",type:"C172R",bew:758.0,arm:1082.8, maxFuelL:null},
-  {reg:"VH-UOR",type:"C172R",bew:756.0,arm:998.3,  maxFuelL:null},
-  {reg:"VH-FPV",type:"C172S",bew:771.0,arm:1002.9, maxFuelL:null},
-  {reg:"VH-KOT",type:"C172S",bew:756.0,arm:998.3,  maxFuelL:null},
-  {reg:"VH-ZDV",type:"C172S",bew:767.8,arm:1030.4, maxFuelL:null},
+  // Usable fuel capacity (round 96) — from the same LTF SOP as round 94's
+  // MTOW/baggage data, §1.3.2 (172R: "Total fuel 56 USG and maximum usable
+  // 53 USG") and §1.3.4 (172S: "Usable fuel 200 lts total 212 lts" — given
+  // directly in litres, no conversion needed). 53 USG converts to 200.63L
+  // at full precision (1 USG = 3.78541L) — a close cross-check against the
+  // S model's own directly-stated 200L, which makes sense given how
+  // closely related the two airframes' fuel systems are. Applied uniformly
+  // across every real tail of each model — the source gives this as a
+  // model-wide spec, not a per-tail figure, same treatment as the DA40's
+  // standard-vs-long-range tank distinction was originally (a type/config
+  // property, not something that varies tail-by-tail within one config).
+  {reg:"VH-SYH",type:"C172R",bew:752.0,arm:992.0,  maxFuelL:200.63},
+  {reg:"VH-LWX",type:"C172R",bew:756.6,arm:991.0,  maxFuelL:200.63},
+  {reg:"VH-LXA",type:"C172R",bew:758.0,arm:1082.8, maxFuelL:200.63},
+  {reg:"VH-UOR",type:"C172R",bew:756.0,arm:998.3,  maxFuelL:200.63},
+  {reg:"VH-FPV",type:"C172S",bew:771.0,arm:1002.9, maxFuelL:200},
+  {reg:"VH-KOT",type:"C172S",bew:756.0,arm:998.3,  maxFuelL:200},
+  {reg:"VH-ZDV",type:"C172S",bew:767.8,arm:1030.4, maxFuelL:200},
   // Sling 2 — real registrations confirmed against the live FlightLogger
-  // fleet pull (round 93). Type-level data (envelope, MAUW, station arms)
-  // is real, from the actual POH — see the SLG2 entry in AIRCRAFT_TYPES
-  // above for the full source citation. Per-tail bew/arm/maxFuelL is null
-  // for all five: the POH's own "Empty CG determination" and "Blank form"
-  // pages are literally blank templates for each aircraft's individual
-  // weighing, not filled-in figures — same situation as every other type
-  // in this app, nothing tail-specific was available to use.
-  {reg:"VH-CCI",type:"SLG2",bew:null,arm:null,maxFuelL:null},
-  {reg:"VH-LLF",type:"SLG2",bew:null,arm:null,maxFuelL:null},
-  {reg:"VH-PPY",type:"SLG2",bew:null,arm:null,maxFuelL:null},
-  {reg:"VH-UUD",type:"SLG2",bew:null,arm:null,maxFuelL:null},
-  {reg:"VH-UUQ",type:"SLG2",bew:null,arm:null,maxFuelL:null},
+  // fleet pull (round 93). Type-level data (envelope, MAUW, station arms,
+  // baggage limits) is real, from the actual POH plus a round-96 per-tail
+  // weighing table — see the SLG2 entry in AIRCRAFT_TYPES above for the
+  // full source citation. Per-tail bew/arm now real for all 5 confirmed
+  // tails (round 96) — user explicitly said this was partial data, more
+  // coming later, so maxFuelL and fuel density remain null; not assumed
+  // complete just because bew/arm arrived.
+  //
+  // VH-FFZ: flagged, not silently included. Appears in the round-96
+  // per-tail table (392.8kg, 1672mm) alongside the 5 known tails, but does
+  // NOT appear in the live FlightLogger fleet pull captured earlier in
+  // this project (which only showed CCI/LLF/PPY/UUD/UUQ as SLG2). Included
+  // since the user provided it directly as real fleet data, same treatment
+  // as VH-FPV's similar discrepancy in round 89 — worth confirming this
+  // one against the current live fleet, not necessarily an error.
+  {reg:"VH-CCI",type:"SLG2",bew:386.3,arm:1697,maxFuelL:null},
+  {reg:"VH-LLF",type:"SLG2",bew:409.3,arm:1685,maxFuelL:null},
+  {reg:"VH-PPY",type:"SLG2",bew:392.9,arm:1676,maxFuelL:null},
+  {reg:"VH-UUD",type:"SLG2",bew:384.0,arm:1658,maxFuelL:null},
+  {reg:"VH-UUQ",type:"SLG2",bew:397.0,arm:1682,maxFuelL:null},
+  {reg:"VH-FFZ",type:"SLG2",bew:392.8,arm:1672,maxFuelL:null},
   // PA44 and DA42 — real registrations confirmed against the live
   // FlightLogger fleet pull (round 94). No per-tail bew/arm given in the
   // SOP source (it's a fleet-wide weight-limits summary, not individual
@@ -1494,7 +1514,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.89.0";
+const VERSION="v0.90.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2134,6 +2154,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.90.0",d:"C172R and C172S are fully real now — all 7 tails. The last missing piece (usable fuel capacity) was actually already sitting in LTF's own SOP from round 94; hadn't been applied yet. C172R: 53 USG usable, converts to 200.63L at full precision. C172S: given directly in litres (200L) — a close cross-check against the R model's converted figure, which makes sense given how closely related the two airframes are. Applied uniformly across every tail of each model, since the source states it as a model-wide spec, not per-tail. Sling 2 also moved forward: real baggage limits now in (35kg front, 25kg rear — matches the station arms already in place exactly), and real per-tail BEW/arm for all 5 previously-known tails plus one new one, VH-FFZ, flagged since it doesn't appear in the earlier live fleet pull (same treatment as VH-FPV's similar discrepancy) — user confirmed this is partial data, more coming later, so fuel density is still null and every Sling 2 tail still correctly shows 'no data yet' despite the real progress. Full 28→29 tail fleet sweep clean, zero errors."},
   {v:"v0.89.0",d:"Business operations optimisations."},
   {v:"v0.88.0",d:"LTF's own Aircraft SOP (v4.0, Jan 2022, the CASA-facing copy) added two new types with real weight/baggage limits — PA44 Seminole (MTOW 1727kg) and DA42 (MTOW 1785kg, three named baggage compartments: Nose 30kg, Baggage 45kg, Out 18kg). Both still correctly show 'no data yet' — this SOP documents weight limits, not the CG-arm placement data W&B needs, so neither type has station arms yet. One figure deliberately NOT used: the SOP's own PA44 fuel numbers are internally contradictory (418L usable stated as MORE than 408L total, which isn't physically possible) — left fuel capacity null rather than guess which number was the typo. Good cross-check confirmation on the DA40: this SOP's MTOW (1200kg), baggage limit (30kg), and both power-setting burn rates (55%: 8.5, 75%: 11 USG/hr) all matched the app's existing figures exactly, and its fuel tank sizes converted to within 1L of what's already in use — strong signal this source is reliable. Smaller discrepancies flagged, not silently resolved: this SOP's C172R/C172S MTOW figures (1114kg/1159kg) differ slightly from the POH-derived figures already in use (1111.30kg/1156.66kg) — kept the POH's numbers, since it's the actual certificated limitations document and this SOP reads as a rounded operational summary. Also noted for the record: this SOP separately documents 172SP and 172RG as distinct variants from 172S/172R — not built as new types, since no real fleet tail currently matches either, but flagged so a future round doesn't get confused between them if one shows up."},
   {v:"v0.87.0",d:"Added Sling 2 (SLG2) as a real aircraft type, from its actual POH (Airplane Factory Sling 2 POH, DC-POH-002-X-B-7, Rev 2.7). Real correction, not just new data: earlier rounds in this project called this type a glider — it's actually a powered two-seat LSA, the misleading code comments are fixed (old changelog entries left as historical record, not rewritten). This type's CG envelope is genuinely simpler than every other type in the app — a plain rectangle (1635-1808mm aft of datum, constant at all weights from 350-700kg), since the POH states the limits don't taper with weight the way the DA40/Decathlon/C172 all do. Cross-checked the numbers against the POH's own %MAC formula before trusting them: computed 20.09%/33.01%, matching the POH's own stated 20%/33%. New capability: a collapsible 'See working out' disclosure on the CG envelope panel, showing the actual derivation step by step with the source citation — built generically (any category can attach one via a workingOut field), not hardcoded to this type, so it's ready for other types later. All 5 real Sling 2 tails added (VH-CCI/LLF/PPY/UUD/UUQ) with honest nulls for per-tail data — the POH's own weighing/blank-form pages are literally templates, same situation as every other type. Verified the whole thing with an isolated test injection (fake bew/arm/maxFuelL/kgPerL, never touching the shipped file): working-out block appears with the right cross-checked numbers when data's complete, stays correctly hidden for types without one (like the DA40), and the real file's full 22-tail sweep still shows every Sling 2 tail honestly as 'no data yet'."},
