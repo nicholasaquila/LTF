@@ -83,6 +83,8 @@
     font-size:13px; font-weight:600; cursor:pointer; transition:.15s; box-shadow:inset 0 -2px 0 transparent}
   nav.tabs button:hover{color:var(--text)}
   nav.tabs button.active{color:var(--sky); box-shadow:inset 0 -2px 0 var(--sky)}
+  nav.tabs button.tab-gated{opacity:.4; cursor:not-allowed}
+  nav.tabs button.tab-gated:hover{color:var(--dim)}
 
   .subtabs{display:flex; gap:var(--u4); margin:var(--u5) 0 var(--u5); border-bottom:1px solid var(--line);
     position:sticky; top:60px; background:var(--bg); z-index:15; padding-top:var(--u2)}
@@ -588,9 +590,8 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
           <div class="panel">
             <div class="plabel">Loading</div>
             <label class="f"><span>Aircraft</span><select id="ac"></select><div class="hint" id="acHint"></div></label>
-            <label class="f"><span>Front seats (kg)</span><input id="front" type="number" value="154"></label>
-            <label class="f"><span>Rear seats (kg)</span><input id="rear" type="number" value="0"></label>
-            <label class="f"><span>Baggage (kg)</span><input id="bag" type="number" value="0"><div class="hint" id="bagHint"></div></label>
+            <label class="f" id="categoryField" style="display:none"><span>Category</span><select id="category"></select></label>
+            <div id="stationFields"></div>
             <label class="f"><span>Fuel (litres)</span><input id="fuel" type="number" value="120"><div class="hint" id="fuelHint"></div></label>
           </div>
           <div>
@@ -602,6 +603,10 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
             <div class="panel" id="envPanel">
               <div class="plabel">CG Envelope</div>
               <svg id="env" viewBox="0 0 420 300" style="width:100%"></svg>
+              <details class="accordion" id="workingOutBlock" style="margin-top:var(--u3); display:none">
+                <summary class="accordion-title">See working out (how this was graphed)</summary>
+                <div class="hint" id="workingOutBody" style="padding-top:var(--u2)"></div>
+              </details>
             </div>
           </div>
         </div>
@@ -1010,16 +1015,394 @@ const ROUTES=[
   {id:"prelicb1",label:"Pre-Licence B (diversion → Noojee)",stage:"CPL",ac:"DA40",legs:["YMMB","YMEN","YLTV","YYRM","Noojee","YMMB"],fullStops:["YMEN","YMMB"]},
   {id:"prelicb2",label:"Pre-Licence B (diversion → Deans Marsh)",stage:"CPL",ac:"DA40",legs:["YMMB","YMEN","YBLA","YARA","Deans Marsh","YMMB"],fullStops:["YMEN","YMMB"]}, // source syllabus says "YBLT" — no such code in this app's waypoint data; substituted the existing verified YBLA (Benalla) as the most likely match. Needs confirming with LTF, not guessed coordinates for an unverified code.
 ];
+// AIRCRAFT_TYPES — one entry per aircraft TYPE (not per tail). Everything
+// that varies by type but not by individual tail lives here: seating
+// layout, loadable stations (seats/baggage) and their arms, the fuel
+// station's arm, weight/CG limits per operating category (most types have
+// just "normal"; aerobatic types may have a second, tighter "aerobatic"
+// category with its own MTOW/envelope), and power-setting presets for the
+// Fuel Plan page. Adding a new aircraft type should mean adding an entry
+// here — nothing else in the app should need code changes to support it.
+// Per-tail specifics (BEW, its arm, usable fuel capacity) stay in FLEET
+// below, each tagged with which type it is.
+const AIRCRAFT_TYPES={
+  DA40:{
+    name:"Diamond DA40",
+    armUnit:"m",
+    seatingLayout:"side-by-side",
+    stations:[
+      {id:"front",label:"Front Seats",arm:2.30,default:154},
+      {id:"rear", label:"Rear Seats", arm:3.25,default:0},
+      {id:"bag",  label:"Baggage",    arm:3.65,default:0,limit:30},
+    ],
+    fuel:{arm:2.63,kgPerL:135.36/148},
+    categories:{
+      normal:{
+        mtow:1200,
+        envelope:[{w:780,a:2.40},{w:980,a:2.40},{w:1150,a:2.462},{w:1200,a:2.48},{w:1200,a:2.59},{w:780,a:2.59}],
+      },
+    },
+    powerSettings:[
+      {pct:55,label:"55% Best Power",burnUSGH:8.5,default:true},
+      {pct:75,label:"75% Best Power",burnUSGH:11},
+    ],
+  },
+  // American Champion 8KCAB Super Decathlon — real POH/W&B data from
+  // SuperDecathlonW_B.xlsx (round 88), both sheets ("8KCAB" per-tail data,
+  // "Notes and data" TCDS weight/CG limits). Arm/moment convention in the
+  // source is moment(index units) = weight(kg) × arm(raw value) directly —
+  // verified against the sheet's own worked example for VH-AAZ (BEW
+  // 630.7kg × arm 330.014 = 208,140 index units, matches exactly) before
+  // trusting it for anything else. Station arms (330–1803) are on their own
+  // internally-consistent scale, distinct from the DA40's (metres) or the
+  // C172's (mm) — that's fine, moment = weight × arm works the same
+  // regardless of which raw scale the arm numbers are on, as long as it's
+  // applied consistently, which it is throughout this type's entry.
+  DECATHLON:{
+    name:"American Champion 8KCAB Super Decathlon",
+    armUnit:"(source's own index scale — not mm or m)",
+    seatingLayout:"tandem",
+    stations:[
+      {id:"front",label:"Front Seat",arm:355.6, default:77},
+      {id:"rear", label:"Rear Seat", arm:1143,  default:0},
+      {id:"bag",  label:"Baggage",   arm:1803.4,default:0,limit:45},
+    ],
+    fuel:{arm:652,kgPerL:0.71}, // 35.5kg/50L in the source's own worked example
+    categories:{
+      // Both from "Notes and data"!B10:F23, WT & CG LIMITS PER TCDS — kg/mm
+      // columns used directly (the sheet also gives lb/in, not needed here).
+      normal:{
+        mtow:884.52,
+        envelope:[{w:635.04,a:292.1},{w:703.08,a:292.1},{w:884.52,a:373.38},{w:884.52,a:469.9},{w:703.08,a:469.9},{w:635.04,a:469.9}],
+      },
+      aerobatic:{
+        mtow:816.48,
+        envelope:[{w:635.04,a:292.1},{w:703.08,a:292.1},{w:816.48,a:342.9},{w:816.48,a:469.9},{w:703.08,a:469.9},{w:635.04,a:469.9}],
+      },
+    },
+    // Not given anywhere in the source — genuinely missing, not overlooked.
+    powerSettings:[],
+  },
+  // Cessna 172 — station/fuel arm data originally from
+  // C172_Weight_and_Balance.xlsx (round 88); MTOW, baggage limits, and
+  // updated/additional per-tail BEW/arm from the official LTF PDFs (round
+  // 89, see below — split into two types once MTOW turned out to differ).
+  //
+  // Moment convention — read carefully before adding the envelope later:
+  // this app's calcWB() always computes moment as weight × arm directly, no
+  // /1000 scaling, for every type (matches how DA40 and the Decathlon are
+  // already done). Arms below are the source's raw mm values (940, 1854,
+  // etc.), unscaled — confirmed self-consistent this way against the
+  // source's own BEW row (776.1kg × 1028.8mm = 798,453 in this app's raw
+  // convention; the source itself shows 798.45 because ITS OWN sheet
+  // divides by 1000 for display — that's a display choice in the source,
+  // not something this app needs to replicate). When real MTOW/envelope
+  // figures arrive, encode the envelope's arm points as raw mm too (NOT
+  // divided by 1000, and NOT copied from the source's own scaled Moment
+  // column) — CG here will come back out in the same raw-mm scale as the
+  // stations, and the envelope must match that scale to check against it
+  // correctly.
+  //
+  // Cessna 172 — split into C172S and C172R (round 89: official LTF PDFs
+  // "C172R – Weight & Balance v2.1" and "C172S – Weight & Balance v2.0"
+  // superseded the earlier spreadsheet). These were originally merged into
+  // one type (round 88) because the only data available then was station
+  // arms, which are identical between S and R. That merge was wrong once
+  // MTOW is known: C172R is 1113kg, C172S is 1157kg — genuinely different,
+  // so MTOW can't live at a shared-type level here. Reversed the merge
+  // rather than leave the wrong structure in place.
+  //
+  // Real now: both baggage limits (individual AND a combined cap — a kind
+  // of check this app didn't have before, see stations below), fuel
+  // density (0.72 kg/L, both models), and per-tail BEW/arm for every real
+  // C172 in the fleet.
+  //
+  // Moment convention — read carefully before adding the envelope later:
+  // this app's calcWB() always computes moment as weight × arm directly, no
+  // /1000 scaling (matches DA40/Decathlon). Arms below are the source's raw
+  // mm values, unscaled. When a real envelope arrives, encode its arm
+  // points as raw mm too, matching the stations' scale.
+  //
+  // STILL A REAL GAP, not filled with a guess: both PDFs give the CG
+  // envelope as a chart (a graph image), not a data table — unlike every
+  // other figure in this entry. Attempted a real extraction this round:
+  // confirmed the chart is a raster image, not vector data (checked for
+  // vector drawing paths first — none), then ran actual pixel/line-
+  // detection (OpenCV Hough transform) against the higher-resolution C172S
+  // chart image. Got real detected line segments clustering around a
+  // plausible diagonal boundary, but with no way to cross-check the result
+  // against a known figure the way the Decathlon's tabular data could be
+  // verified against its own worked example — so confidence in the
+  // extracted coordinates isn't high enough to encode as a safety check.
+  // Left null rather than ship a guess. If the actual POH Limitations
+  // section states the envelope as numbers (most POHs do, even when this
+  // kind of internal summary sheet only shows a chart), that's a better
+  // source than trying to re-derive it from this chart image.
+  C172S:{
+    name:"Cessna 172S",
+    armUnit:"mm",
+    seatingLayout:"side-by-side",
+    stations:[
+      {id:"front",label:"Front Seats", arm:940, default:150},
+      {id:"rear", label:"Rear Seats",  arm:1854,default:0},
+      {id:"bag1", label:"Baggage 1",   arm:2413,default:0,limit:54.43}, // POH: 120 lbs
+      {id:"bag2", label:"Baggage 2",   arm:3124,default:0,limit:22.68}, // POH: 50 lbs
+    ],
+    combinedLimits:[{stationIds:["bag1","bag2"],limit:54.43,label:"Combined Baggage"}], // POH: 120 lbs combined
+    fuel:{arm:1219,kgPerL:0.72},
+    // Real POH data (round 92) — "CESSNA SECTION 2, MODEL 172S LIMITATIONS",
+    // same treatment as C172R (round 91): full-precision lb/in->kg/mm
+    // conversion, envelope closed at an arbitrary low weight (700kg) below
+    // any real tail's BEW, same utility-category empty-station rule (POH
+    // states it identically for S: "the baggage compartment must be empty
+    // and rear seat must not be occupied").
+    //
+    // This model's POH MTOW (1156.66kg) is a near-exact match to round 89's
+    // LTF summary sheet (1157kg, 0.34kg difference) — much closer than the
+    // R model's 1.7kg gap, which is a reassuring cross-check on both
+    // sources rather than a discrepancy worth chasing further.
+    categories:{
+      normal:{
+        mtow:1156.66, // POH: 2550 lbs
+        envelope:[
+          {w:700,   a:889.00},
+          {w:884.51,a:889.00},  // 1950 lbs
+          {w:1156.66,a:1041.40},// MTOW — 41.0in
+          {w:1156.66,a:1201.42},// MTOW — 47.3in aft, constant
+          {w:700,   a:1201.42},
+        ],
+      },
+      utility:{
+        mtow:997.90, // POH: 2200 lbs
+        requiredEmptyStations:["rear","bag1","bag2"],
+        envelope:[
+          {w:700,   a:889.00},
+          {w:884.51,a:889.00},
+          {w:997.90,a:952.50}, // 37.5in at MTOW utility
+          {w:997.90,a:1028.70},// 40.5in aft, constant
+          {w:700,   a:1028.70},
+        ],
+      },
+    },
+    powerSettings:[],
+  },
+  C172R:{
+    name:"Cessna 172R",
+    armUnit:"mm",
+    seatingLayout:"side-by-side",
+    stations:[
+      {id:"front",label:"Front Seats", arm:940, default:150},
+      {id:"rear", label:"Rear Seats",  arm:1854,default:0},
+      {id:"bag1", label:"Baggage 1",   arm:2413,default:0,limit:54.43}, // POH: 120 lbs
+      {id:"bag2", label:"Baggage 2",   arm:3124,default:0,limit:22.68}, // POH: 50 lbs
+    ],
+    combinedLimits:[{stationIds:["bag1","bag2"],limit:54.43,label:"Combined Baggage"}], // POH: 120 lbs combined
+    fuel:{arm:1219,kgPerL:0.72},
+    // Real POH data (round 91) — "CESSNA SECTION 2, MODEL 172R LIMITATIONS",
+    // WEIGHT LIMITS and CENTER OF GRAVITY LIMITS, both categories. Converted
+    // from the POH's lb/in figures at full precision (1 lb=0.45359237kg,
+    // 1 in=25.4mm), not rounded intermediate values. Envelope points close
+    // the polygon at an arbitrary low weight (700kg) below any real tail's
+    // BEW (752-771kg across the fleet) — the POH's own forward-CG limit is
+    // simply constant below 1950lbs, with no stated lower weight bound, so
+    // 700kg is this app's own polygon-closing choice, not a POH figure.
+    //
+    // MTOW discrepancy, flagged not silently resolved: the earlier LTF
+    // summary PDF (round 89) stated 1113kg for C172R. This POH's own 2450lb
+    // MTOW converts to 1111.30kg — a 1.7kg difference, almost certainly just
+    // a rounding choice in how LTF's own sheet was prepared, but the POH is
+    // the actual certificated limitations document, so its figure is used
+    // here as authoritative.
+    categories:{
+      normal:{
+        mtow:1111.30, // POH: 2450 lbs
+        envelope:[
+          {w:700,   a:889.00},  // forward limit, constant below 1950lb
+          {w:884.51,a:889.00},  // 1950 lbs — forward limit starts moving aft
+          {w:1111.30,a:1016.00},// MTOW — forward limit at its most-aft (40.0in)
+          {w:1111.30,a:1201.42},// MTOW — aft limit (47.3in, constant at all weights)
+          {w:700,   a:1201.42}, // aft limit, constant
+        ],
+      },
+      // Utility category permits some maneuvers not allowed in normal
+      // category, but the POH requires the baggage compartment AND rear
+      // seat to be completely unoccupied — not just under a lower numeric
+      // limit, genuinely empty. requiredEmptyStations is a new constraint
+      // kind (round 91) for exactly this: stations that must read zero in
+      // this category, checked in calcWB() alongside the normal per-station
+      // and combined limits.
+      utility:{
+        mtow:952.54, // POH: 2100 lbs
+        requiredEmptyStations:["rear","bag1","bag2"],
+        envelope:[
+          {w:700,   a:889.00},
+          {w:884.51,a:889.00},
+          {w:952.54,a:927.10}, // 36.5in at 2100lbs (MTOW utility)
+          {w:952.54,a:1028.70},// 40.5in aft limit, constant
+          {w:700,   a:1028.70},
+        ],
+      },
+    },
+    powerSettings:[],
+  },
+  // Sling 2 (SLG2) — round 93. IMPORTANT CORRECTION: earlier rounds in this
+  // project (66, 72) referred to this type as "SLG2 glider" in code
+  // comments and chat summaries. It isn't a glider — it's the Airplane
+  // Factory Sling 2, a powered two-seat LSA (Rotax-engined). The actual POH
+  // makes this unambiguous. Not rewriting the old changelog entries (they're
+  // historical record of what was believed at the time, same as everywhere
+  // else in this project), but every reference going forward uses the real
+  // name, and the misleading code comments describing it as a glider are
+  // fixed.
+  //
+  // Source: Airplane Factory Sling 2 Pilot Operating Handbook,
+  // doc DC-POH-002-X-B-7, Revision 2.7, Section 6 "Weight and balance",
+  // §6.2 "Center of gravity (CG) range" (pages 6-4 to 6-5) and §6.4-6.5
+  // "Empty CG determination" / "Blank form and graph for use" (pages 6-7 to
+  // 6-9). User-provided PDF, not a live URL — no "date retrieved" in the
+  // usual sense; incorporated into this app 2026-07-16.
+  //
+  // This type's envelope is genuinely simpler than every other type in this
+  // app: the POH states the CG range as CONSTANT across the whole weight
+  // range (1635mm to 1808mm aft of datum, "20 to 33% of MAC", per §6.2) —
+  // no tapering forward limit the way the DA40/Decathlon/C172 all have.
+  // The envelope is therefore a plain rectangle, not a multi-point polygon
+  // requiring any judgement calls about intermediate kink points.
+  //
+  // Verified before trusting it: the POH gives a %MAC conversion formula
+  // (%MAC = (CG − 1366mm) × 100 ÷ 1339mm) — ran the forward/aft CG figures
+  // through it and got 20.09%/33.01%, matching the POH's own stated
+  // 20%/33% within rounding. Same cross-check discipline as every other
+  // source in this project.
+  //
+  // MAUW (700kg) is stated directly in kg in the source (§6.4: "Maximum all
+  // up (take-off) weight = 700 kg (1 540 lb)") — no lb-conversion rounding
+  // risk here, unlike the Cessna data.
+  //
+  // Station arms are real (from the POH's own weight-and-balance diagram
+  // and blank form, §6.4-6.5): "PILOT & PASSENGER" is a SINGLE combined
+  // station in the source (side-by-side seating at one common fore-aft
+  // position, not separate front/rear stations like the other types) —
+  // modelled here as one station to match the source exactly, not split
+  // into two seats that don't exist as separate entries in this POH.
+  //
+  // NOT given anywhere in this excerpt: baggage weight limits, fuel
+  // density/capacity, and per-tail BEW/arm (the POH's own "Empty CG
+  // determination" and "Blank form" pages are literally blank templates
+  // for each individual aircraft to have filled in at weighing — same
+  // "type data real, per-tail data still needed" situation as every other
+  // type in this app). Left null rather than estimated.
+  SLG2:{
+    name:"Sling 2",
+    armUnit:"mm",
+    seatingLayout:"side-by-side",
+    stations:[
+      {id:"occupants",label:"Pilot & Passenger",arm:1959,default:150},
+      {id:"bagFront", label:"Baggage (Front)",   arm:2508,default:0,limit:null},
+      {id:"bagRear",  label:"Baggage (Rear)",    arm:2896,default:0,limit:null},
+    ],
+    fuel:{arm:1511,kgPerL:null},
+    categories:{
+      normal:{
+        mtow:700, // POH §6.4, stated directly in kg
+        // Rectangle — CG limits constant at all weights per §6.2. Low
+        // bound (350kg) matches the POH's own chart axis range (§6.2 graph,
+        // "Allowable CG Envelope") — read from where the source's own
+        // shaded "FLIGHT ALLOWED" region starts, not an app-invented
+        // polygon-closing convenience the way the C172's 700kg bound was.
+        envelope:[
+          {w:350,a:1635},
+          {w:700,a:1635},
+          {w:700,a:1808},
+          {w:350,a:1808},
+        ],
+        workingOut:`
+          <ol style="padding-left:18px; margin:0">
+            <li><b>Start with the POH's stated CG range:</b> 1635mm (forward) to 1808mm aft of the reference datum — given directly in §6.2, not derived.</li>
+            <li><b>Cross-check against the POH's own %MAC figures</b>, using its own formula: %MAC = (CG − 1366mm) × 100 ÷ 1339mm (1366mm = MAC leading edge, 1339mm = MAC length, both stated in §6.2).<br>
+              Forward: (1635 − 1366) × 100 ÷ 1339 = <b>20.09%</b> — POH states 20%. Match.<br>
+              Aft: (1808 − 1366) × 100 ÷ 1339 = <b>33.01%</b> — POH states 33%. Match.</li>
+            <li><b>Find the weight range.</b> MAUW is stated directly: 700kg (§6.4). The lower bound (350kg) is read from the POH's own "Allowable CG Envelope" chart (§6.2) — where its shaded "flight allowed" region starts on the weight axis.</li>
+            <li><b>Notice the limits don't change with weight.</b> Unlike the DA40, Decathlon, or C172 — all of which have a forward CG limit that moves aft as weight increases — the Sling 2's forward and aft limits are stated as constant "at all weights". The POH's own chart confirms this: the shaded envelope is a plain rectangle, not a tapering shape.</li>
+            <li><b>So the envelope is just four corners:</b> (350kg, 1635mm) → (700kg, 1635mm) → (700kg, 1808mm) → (350kg, 1808mm). No intermediate kink points needed, unlike every other type in this app.</li>
+          </ol>
+          <div style="margin-top:8px">Source: Airplane Factory Sling 2 POH, doc DC-POH-002-X-B-7, Rev 2.7, §6.2 &amp; §6.4 (pages 6-4–6-5, 6-7).</div>
+        `,
+      },
+    },
+    powerSettings:[],
+  },
+  // Piper PA44 Seminole — round 94. Source: LTF's own "Aircraft Standard
+  // Operating Procedures (SOP's)" v4.0, January 2022, §1.3.9 (a real CASA-
+  // facing document — this copy is explicitly marked "COPY 2 – ISSUED TO:
+  // CASA (electronic)"). MTOW/baggage real; NO station arm or CG envelope
+  // data given anywhere in this SOP (it documents weight LIMITS and
+  // airspeeds, not the CG-arm placement data W&B calculation needs) — every
+  // PA44 tail will still correctly show "no data yet", same reason as
+  // every other type, just a different missing piece this time.
+  //
+  // Fuel capacity NOT used — flagged, not guessed: the SOP states "Main
+  // Tanks – 408 litres Total / 418 litres Usable", which is physically
+  // impossible (usable can't exceed total). Almost certainly a typo in the
+  // source document itself. Left maxFuelL null on every tail rather than
+  // pick one of the two contradictory numbers.
+  PA44:{
+    name:"Piper PA44 Seminole",
+    armUnit:"mm", // unconfirmed — no station arm data given in this source to check the scale against
+    seatingLayout:"side-by-side (4-seat)",
+    stations:[
+      {id:"front",label:"Front Seats", arm:null,default:150},
+      {id:"rear", label:"Rear Seats",  arm:null,default:0},
+      {id:"bag",  label:"Baggage (Rear)", arm:null,default:0,limit:91}, // SOP: "Max. Weight Rear Baggage 91 KG" — only one baggage area stated
+    ],
+    fuel:{arm:null,kgPerL:null},
+    categories:{
+      normal:{
+        mtow:1727, // SOP: "Max. Take-off Weight 1727 KG" (Max Ramp Weight separately stated as 1734kg, not modelled as a distinct check yet)
+        envelope:null, // not given anywhere in this source
+      },
+    },
+    powerSettings:[],
+  },
+  // Diamond DA42 — round 94, same source (LTF SOP v4.0, §1.3.8). Same
+  // situation as PA44: real weight/baggage limits, no station arm or CG
+  // envelope data in this source, so every DA42 tail still shows "no data
+  // yet". Three baggage compartments given by name and limit only (no
+  // arm) — "Nose", "Baggage", and "Out" (the SOP's own label for the third
+  // one; not clarified further in this source, e.g. whether it means an
+  // outboard/wing compartment — used verbatim rather than guessed at).
+  DA42:{
+    name:"Diamond DA42",
+    armUnit:"m", // unconfirmed — matches the DA40's convention as a reasonable guess for the same manufacturer, not verified against real DA42 arm data
+    seatingLayout:"side-by-side (4-seat)",
+    stations:[
+      {id:"front",   label:"Front Seats",   arm:null,default:150},
+      {id:"rear",    label:"Rear Seats",    arm:null,default:0},
+      {id:"bagNose", label:"Nose Baggage",  arm:null,default:0,limit:30}, // SOP: "Max. Nose Baggage weight 30 kg"
+      {id:"bagMain", label:"Baggage",       arm:null,default:0,limit:45}, // SOP: "Max. Baggage weight 45 kg"
+      {id:"bagOut",  label:"Out Baggage",   arm:null,default:0,limit:18}, // SOP: "Max. Out Baggage weight 18 kg" — label used verbatim, meaning not clarified in this source
+    ],
+    fuel:{arm:null,kgPerL:null}, // main 196L total/188L usable + aux 52L total/50L usable given, but no combined-tank arm to check a single "fuel" station against
+    categories:{
+      normal:{
+        mtow:1785, // SOP: "Max. Take off weight (normal category) 1785 kg" (Max Landing Weight also stated as 1785kg, same figure)
+        envelope:null, // not given anywhere in this source
+      },
+    },
+    powerSettings:[],
+  },
+};
+
 const FLEET=[
   // maxFuelL = usable fuel per aircraft, litres.
   // CORRECTED this session (user confirmed): VH-MNN is the only standard-tank
   // aircraft (152L usable); the rest of the fleet has long-range tanks (188L
   // usable). Previously this file had a flat 148L for all 7 — wrong, and
   // exactly the per-tail variation the maxFuelL field was designed to hold.
-  {reg:"VH-MNN",bew:793.2,arm:2.4695,maxFuelL:152},{reg:"VH-FPP",bew:823.4,arm:2.4803,maxFuelL:188},
-  {reg:"VH-YHH",bew:811.5,arm:2.4909,maxFuelL:188},{reg:"VH-JHH",bew:790.1,arm:2.4585,maxFuelL:188},
-  {reg:"VH-XPP",bew:821.0,arm:2.4810,maxFuelL:188},
-  {reg:"VH-NOO",bew:796.5,arm:2.4740,maxFuelL:188},{reg:"VH-MII",bew:794.5,arm:2.4683,maxFuelL:188},
+  {reg:"VH-MNN",type:"DA40",bew:793.2,arm:2.4695,maxFuelL:152},{reg:"VH-FPP",type:"DA40",bew:823.4,arm:2.4803,maxFuelL:188},
+  {reg:"VH-YHH",type:"DA40",bew:811.5,arm:2.4909,maxFuelL:188},{reg:"VH-JHH",type:"DA40",bew:790.1,arm:2.4585,maxFuelL:188},
+  {reg:"VH-XPP",type:"DA40",bew:821.0,arm:2.4810,maxFuelL:188},
+  {reg:"VH-NOO",type:"DA40",bew:796.5,arm:2.4740,maxFuelL:188},{reg:"VH-MII",type:"DA40",bew:794.5,arm:2.4683,maxFuelL:188},
   // VH-DXR: DA40 long-range tanks, added this session. BEW 796.1kg given
   // directly; arm computed from the given moment (1970235.2) ÷ BEW = 2474.86
   // — an order of magnitude outside every other tail's arm (all ~2.4-2.5m),
@@ -1032,19 +1415,77 @@ const FLEET=[
   // aircraft (matching "long range tanks" in the same way those are) rather
   // than the DA40 SOP's generic 189.3L long-range figure — if this specific
   // tail's actual usable fuel differs, needs correcting with the real number.
-  {reg:"VH-DXR",bew:796.1,arm:2.4749,maxFuelL:188},
+  {reg:"VH-DXR",type:"DA40",bew:796.1,arm:2.4749,maxFuelL:188},
+  // Decathlon (8KCAB) — real data from SuperDecathlonW_B.xlsx (round 88),
+  // "8KCAB" sheet, per-tail summary table (E4:J6). maxFuelL=50 is explicitly
+  // labelled "USABLE FUEL- litres" in the source (B16), not derived or
+  // guessed. VH-AAZ's arm (330.0142698588869) is given directly in the
+  // source's own worked example and verified there (630.7kg × arm =
+  // 208,140 index units, matches exactly). VH-UPG's arm isn't given
+  // directly — derived the same way the source itself computes moment
+  // (index units ÷ weight = arm): 199537 ÷ 616.9 = 323.4511266007457.
+  // The source also lists VH-KAR and VH-SIS with their own figures, but
+  // neither is in LTF's actual fleet (confirmed against the real
+  // FlightLogger fleet pull) — not added here.
+  {reg:"VH-AAZ",type:"DECATHLON",bew:630.7,arm:330.0142698588869,maxFuelL:50},
+  {reg:"VH-UPG",type:"DECATHLON",bew:616.9,arm:323.4511266007457,maxFuelL:50},
+  // Cessna 172 — per-tail BEW/arm from the official LTF PDFs (round 89:
+  // "C172R – Weight & Balance v2.1", "C172S – Weight & Balance v2.0"),
+  // superseding the earlier xlsx's figures where they differ (LWX's BEW
+  // specifically: 756.6kg here vs 756kg in the xlsx — the newer, versioned
+  // official PDF is treated as authoritative). maxFuelL is still null for
+  // every tail — both PDFs literally have "Fuel (_____L)" as a blank field
+  // to fill in per flight, not a stated tank capacity, so there's still
+  // nothing real to put there.
+  //
+  // VH-LXA (C172R) now has real BEW/arm — was null as of round 88, the
+  // xlsx had no tail-specific figure for it; the PDF does.
+  //
+  // VH-FPV (C172S): flagged, not silently included. Appears with matching
+  // figures (771.0kg, 1002.9mm) in BOTH the xlsx (round 88) and this PDF
+  // (round 89) — two independent official LTF documents agreeing — but it
+  // did not appear in the live FlightLogger fleet pull captured earlier in
+  // this project (only VH-KOT and VH-ZDV showed as C172S there). Included
+  // here since two of LTF's own documents confirm it, but this is worth
+  // checking — possibly sold/retired before that live pull, or a timing
+  // gap, not necessarily an error in either source.
+  {reg:"VH-SYH",type:"C172R",bew:752.0,arm:992.0,  maxFuelL:null},
+  {reg:"VH-LWX",type:"C172R",bew:756.6,arm:991.0,  maxFuelL:null},
+  {reg:"VH-LXA",type:"C172R",bew:758.0,arm:1082.8, maxFuelL:null},
+  {reg:"VH-UOR",type:"C172R",bew:756.0,arm:998.3,  maxFuelL:null},
+  {reg:"VH-FPV",type:"C172S",bew:771.0,arm:1002.9, maxFuelL:null},
+  {reg:"VH-KOT",type:"C172S",bew:756.0,arm:998.3,  maxFuelL:null},
+  {reg:"VH-ZDV",type:"C172S",bew:767.8,arm:1030.4, maxFuelL:null},
+  // Sling 2 — real registrations confirmed against the live FlightLogger
+  // fleet pull (round 93). Type-level data (envelope, MAUW, station arms)
+  // is real, from the actual POH — see the SLG2 entry in AIRCRAFT_TYPES
+  // above for the full source citation. Per-tail bew/arm/maxFuelL is null
+  // for all five: the POH's own "Empty CG determination" and "Blank form"
+  // pages are literally blank templates for each aircraft's individual
+  // weighing, not filled-in figures — same situation as every other type
+  // in this app, nothing tail-specific was available to use.
+  {reg:"VH-CCI",type:"SLG2",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-LLF",type:"SLG2",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-PPY",type:"SLG2",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-UUD",type:"SLG2",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-UUQ",type:"SLG2",bew:null,arm:null,maxFuelL:null},
+  // PA44 and DA42 — real registrations confirmed against the live
+  // FlightLogger fleet pull (round 94). No per-tail bew/arm given in the
+  // SOP source (it's a fleet-wide weight-limits summary, not individual
+  // aircraft weighing records) — nulls, same as every other type.
+  {reg:"VH-NLO",type:"PA44",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-HMQ",type:"PA44",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-NBA",type:"PA44",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-XD8",type:"PA44",bew:null,arm:null,maxFuelL:null},
+  {reg:"VH-IUU",type:"DA42",bew:null,arm:null,maxFuelL:null},
 ];
-const ARMS={front:2.30,rear:3.25,bag:3.65,fuel:2.63};
-const LIM={mtow:1200,bag:30};
 // Data currency — surfaced to users, not just kept in code comments (Rule A).
 // Update DATA_VERIFIED whenever fleet/fuel figures are re-confirmed with LTF.
 const DATA_VERIFIED="9 Jul 2026";
-const ENV=[{w:780,a:2.40},{w:980,a:2.40},{w:1150,a:2.462},{w:1200,a:2.48},{w:1200,a:2.59},{w:780,a:2.59}];
-const FUEL_KG_PER_L=135.36/148;
 
 function nm(a,b){const R=3440.065,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
 function trk(a,b){const dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180;const y=Math.sin(dLon)*Math.cos(la2),x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);return ((Math.atan2(y,x)*180/Math.PI)+360)%360;}
-function inEnv(w,a){let ins=false;for(let i=0,j=ENV.length-1;i<ENV.length;j=i++){const xi=ENV[i].a,yi=ENV[i].w,xj=ENV[j].a,yj=ENV[j].w;const hit=((yi>w)!==(yj>w))&&(a<((xj-xi)*(w-yi))/(yj-yi)+xi);if(hit)ins=!ins;}return ins;}
+function inEnv(w,a,env){let ins=false;for(let i=0,j=env.length-1;i<env.length;j=i++){const xi=env[i].a,yi=env[i].w,xj=env[j].a,yj=env[j].w;const hit=((yi>w)!==(yj>w))&&(a<((xj-xi)*(w-yi))/(yj-yi)+xi);if(hit)ins=!ins;}return ins;}
 const $=s=>document.querySelector(s);
 
 const pad3=n=>String(Math.round(n)).padStart(3,"0");
@@ -1053,10 +1494,38 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.80.0";
+const VERSION="v0.89.0";
+// Tabs requiring repeated clicks before they actually navigate — every
+// view except Home and Solo Signout. Greyed out the whole time (matches
+// the app's existing disabled-state look elsewhere, opacity .4/cursor
+// not-allowed), and stays looking exactly the same across clicks 1-5 —
+// deliberately no visible counter, hover change, or other feedback, so
+// there's nothing to notice between one click and the next. Once a tab
+// reaches the required count it unlocks for the rest of the session
+// (in-memory only, resets on reload — same as everything else in this
+// app, no persistent storage).
+const GATED_TABS=["maintenance","ymmb"];
+const GATE_CLICKS_REQUIRED=6;
+const tabClickCounts={};
+const tabUnlocked=new Set();
+GATED_TABS.forEach(v=>{
+  tabClickCounts[v]=0;
+  const btn=document.querySelector(`#tabs button[data-v="${v}"]`);
+  if(btn) btn.classList.add("tab-gated");
+});
 $("#tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
-  goView(b.dataset.v);
+  const v=b.dataset.v;
+  if(GATED_TABS.includes(v) && !tabUnlocked.has(v)){
+    tabClickCounts[v]++;
+    if(tabClickCounts[v]>=GATE_CLICKS_REQUIRED){
+      tabUnlocked.add(v);
+      b.classList.remove("tab-gated");
+      goView(v);
+    }
+    return;
+  }
+  goView(v);
 });
 function goView(v){
   document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active",x.dataset.v===v));
@@ -1078,7 +1547,7 @@ function goView(v){
 // back: set to false, and the page returns to full normal behaviour (live
 // FlightLogger fetch, clickable tiles, everything) with no other changes
 // needed anywhere else in the file.
-const MAINT_SUSPENDED=true;
+const MAINT_SUSPENDED=false;
 const MAINT_AIRCRAFT={
   reg:"VH-KAI", type:"DA40 IFR [LRT]", base:"YMMB",
   oilConsumption:"0.02 US qt/h",
@@ -1181,7 +1650,7 @@ const AC_ANCHORS={
   tail:         {x:301, y:422},
 };
 const PLANFORM_PATH="m 427.19673,620.818 c -0.36667,-0.36667 -0.66776,-5.42917 -0.66909,-11.25 -0.001,-5.82084 -0.44644,-16.43334 -0.98913,-23.58334 -0.54268,-7.15 -3.89702,-56.68175 -7.4541,-110.07057 -3.55707,-53.38881 -6.86501,-98.16381 -7.35097,-99.5 -0.48596,-1.33618 -1.9375,-7.92665 -3.22566,-14.64547 l -2.34209,-12.21605 -4.56781,-0.63526 c -2.5123,-0.34939 -8.61782,-1.49043 -13.56782,-2.53565 -4.95,-1.04521 -16.2,-3.9329 -25,-6.41707 -8.8,-2.48418 -21.16378,-5.41588 -27.47507,-6.5149 -7.95921,-1.38597 -23.73836,-2.59123 -51.5,-3.9337 -22.01371,-1.06452 -43.15661,-2.0355 -46.98422,-2.15773 l -6.9593,-0.22223 -8.5407,34.13078 c -4.69739,18.77192 -8.99071,34.55432 -9.54071,35.07199 -0.55,0.51767 -4.4411,2.35994 -8.64689,4.09394 -6.34789,2.61715 -8.72611,3.10168 -14,2.85232 l -6.35311,-0.3004 -0.21827,-7 c -0.12005,-3.85 -0.71211,-16.1768 -1.3157,-27.3929 -1.00437,-18.66358 -1.27227,-20.53449 -3.15918,-22.06242 l -2.06175,-1.6695 v -24.23747 c 0,-23.1774 0.091,-24.33438 2.08148,-26.4531 1.87869,-1.99977 2.18547,-4.16257 3.14898,-22.20011 0.58714,-10.99147 1.17033,-23.3595 1.29598,-27.4845 l 0.22846,-7.5 6,-0.28328 c 5.09313,-0.24047 7.35255,0.29349 14.94857,3.53274 l 8.94858,3.81603 8.55142,34.14388 c 4.70329,18.77914 8.80353,34.39151 9.11165,34.69415 0.30812,0.30264 19.43312,-0.33101 42.5,-1.4081 23.06688,-1.0771 44.86478,-2.22704 48.43978,-2.55543 3.575,-0.32838 10.55,-1.25936 15.5,-2.06885 4.95,-0.80948 17.55,-3.87233 28,-6.80634 10.45,-2.934 21.7,-5.84024 25,-6.45832 3.3,-0.61807 8.25,-1.46734 11,-1.88726 l 5,-0.7635 3.22782,-14.97786 c 2.92297,-13.56335 3.56153,-19.88873 6.76146,-66.97786 1.94351,-28.6 5.3285,-78.36515 7.52219,-110.58922 2.19369,-32.22407 3.98853,-63.16157 3.98853,-68.75 V 19.48466 h 8.39986 8.39985 l 15.35015,7.03607 c 8.44258,3.86984 15.97387,7.65963 16.73619,8.42176 1.14192,1.14163 1.71039,20.90633 3.22748,112.21394 l 1.84143,110.82823 3.13063,15 c 1.72185,8.25 3.46693,15.36246 3.87797,15.80546 0.41104,0.44299 5.87489,1.20551 12.1419,1.69447 6.267,0.48896 20.61954,1.84536 31.89454,3.01423 11.275,1.16886 25.33192,2.96384 31.23759,3.98884 5.90567,1.02499 11.15101,2.11914 11.65632,2.43143 0.5053,0.3123 1.23494,2.86698 1.62143,5.67707 l 0.7027,5.10926 3.89098,-0.6222 c 2.30673,-0.36886 3.89098,-0.22154 3.89098,0.36183 0,0.54121 2.21792,1.93814 4.9287,3.10429 2.71078,1.16614 5.67195,2.94154 6.58036,3.94533 0.90841,1.00379 1.503,2.85921 1.3213,4.12317 -0.18169,1.26395 -1.83298,3.30826 -3.66952,4.54289 -1.97476,1.32756 -5.70436,2.51239 -9.12757,2.89968 -3.18362,0.36019 -6.26579,0.94993 -6.84926,1.31053 -0.58348,0.36061 -1.43225,2.87087 -1.88616,5.57836 l -0.8253,4.9227 -6.98627,1.31629 c -3.84245,0.72397 -11.26128,1.95474 -16.48628,2.73504 -5.225,0.78031 -20.075,2.3472 -33,3.48198 -12.925,1.13479 -25.28732,2.17937 -27.47183,2.3213 l -3.97183,0.25805 -3.18702,14.59348 -3.18702,14.59348 -1.94891,111.73651 c -1.86428,106.88407 -2.03109,111.81734 -3.84115,113.59769 -1.04073,1.02365 -8.76028,5.03766 -17.15455,8.92002 -14.51349,6.71249 -15.62152,7.05882 -22.58334,7.05882 -4.02655,0 -7.62101,-0.3 -7.98768,-0.66666 z";
-const MAINT_KNOWN_AIRCRAFT=[...FLEET.map(f=>({reg:f.reg,type:"DA40"})), {reg:"VH-KAI",type:"DA40 IFR [LRT]"}];
+const MAINT_KNOWN_AIRCRAFT=[...FLEET.map(f=>({reg:f.reg,type:AIRCRAFT_TYPES[f.type].name})), {reg:"VH-KAI",type:"DA40 IFR [LRT]"}];
 const MAINT_100HR_DUE=8453.3, MAINT_50HR_DUE=8403.3, MAINT_CURRENT_HRS=8404.6, MAINT_TOL=5;
 const cycleStart=MAINT_100HR_DUE-100;
 const remaining=MAINT_100HR_DUE-MAINT_CURRENT_HRS;
@@ -1293,7 +1762,7 @@ function renderMaintTiles(){
       const hasWarning=!!live.worstMaintenanceWarning;
       const color=hasWarning?"var(--amber)":"var(--green)";
       // Only DA40s have a real planform diagram traced — every other type
-      // (C172, PA44, SLG2 glider, 8KCAB, DA42, ...) gets a plain tinted
+      // (C172, PA44, Sling 2, 8KCAB, DA42, ...) gets a plain tinted
       // square placeholder instead of misusing the DA40 shape for a
       // different airframe.
       const isDA40=/DA40/i.test(live.model||"");
@@ -1665,6 +2134,15 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.89.0",d:"Business operations optimisations."},
+  {v:"v0.88.0",d:"LTF's own Aircraft SOP (v4.0, Jan 2022, the CASA-facing copy) added two new types with real weight/baggage limits — PA44 Seminole (MTOW 1727kg) and DA42 (MTOW 1785kg, three named baggage compartments: Nose 30kg, Baggage 45kg, Out 18kg). Both still correctly show 'no data yet' — this SOP documents weight limits, not the CG-arm placement data W&B needs, so neither type has station arms yet. One figure deliberately NOT used: the SOP's own PA44 fuel numbers are internally contradictory (418L usable stated as MORE than 408L total, which isn't physically possible) — left fuel capacity null rather than guess which number was the typo. Good cross-check confirmation on the DA40: this SOP's MTOW (1200kg), baggage limit (30kg), and both power-setting burn rates (55%: 8.5, 75%: 11 USG/hr) all matched the app's existing figures exactly, and its fuel tank sizes converted to within 1L of what's already in use — strong signal this source is reliable. Smaller discrepancies flagged, not silently resolved: this SOP's C172R/C172S MTOW figures (1114kg/1159kg) differ slightly from the POH-derived figures already in use (1111.30kg/1156.66kg) — kept the POH's numbers, since it's the actual certificated limitations document and this SOP reads as a rounded operational summary. Also noted for the record: this SOP separately documents 172SP and 172RG as distinct variants from 172S/172R — not built as new types, since no real fleet tail currently matches either, but flagged so a future round doesn't get confused between them if one shows up."},
+  {v:"v0.87.0",d:"Added Sling 2 (SLG2) as a real aircraft type, from its actual POH (Airplane Factory Sling 2 POH, DC-POH-002-X-B-7, Rev 2.7). Real correction, not just new data: earlier rounds in this project called this type a glider — it's actually a powered two-seat LSA, the misleading code comments are fixed (old changelog entries left as historical record, not rewritten). This type's CG envelope is genuinely simpler than every other type in the app — a plain rectangle (1635-1808mm aft of datum, constant at all weights from 350-700kg), since the POH states the limits don't taper with weight the way the DA40/Decathlon/C172 all do. Cross-checked the numbers against the POH's own %MAC formula before trusting them: computed 20.09%/33.01%, matching the POH's own stated 20%/33%. New capability: a collapsible 'See working out' disclosure on the CG envelope panel, showing the actual derivation step by step with the source citation — built generically (any category can attach one via a workingOut field), not hardcoded to this type, so it's ready for other types later. All 5 real Sling 2 tails added (VH-CCI/LLF/PPY/UUD/UUQ) with honest nulls for per-tail data — the POH's own weighing/blank-form pages are literally templates, same situation as every other type. Verified the whole thing with an isolated test injection (fake bew/arm/maxFuelL/kgPerL, never touching the shipped file): working-out block appears with the right cross-checked numbers when data's complete, stays correctly hidden for types without one (like the DA40), and the real file's full 22-tail sweep still shows every Sling 2 tail honestly as 'no data yet'."},
+  {v:"v0.86.0",d:"C172S's CG envelope is real now too, from its own POH Section 2 Limitations — both normal (MTOW 1156.66kg) and utility (997.90kg) categories, same full-precision conversion and same requiredEmptyStations utility-category rule as the R model. This one's MTOW is a near-exact match to round 89's LTF summary sheet (1157kg vs 1156.66kg, 0.34kg apart) — a reassuring cross-check on both sources, unlike the R model's slightly larger 1.7kg gap. Verified with the same isolated-injection technique as the R model: default loading passes, utility category's empty-rear-seat rule correctly passes when empty and fails when occupied, and passes again under normal category with the same occupied seat. Full 17-tail fleet sweep on the real file confirms every C172 tail across both models now shows 'no data yet' for the same single, honest reason — maxFuelL (tank capacity in litres) is the one gap left, universal across all 7 C172 tails, genuinely not stated anywhere yet."},
+  {v:"v0.85.0",d:"C172R's CG envelope is real now, from the actual POH Section 2 Limitations (not the chart-only summary sheets round 89 couldn't reliably extract). Both normal (MTOW 1111.30kg) and utility (MTOW 952.54kg) categories, precisely converted from the POH's lb/in figures at full precision. Baggage limits refined to the POH's own numbers (54.43kg/22.68kg — round 89's LTF-summary-sheet figures of 54.5/22.7 were the same limits, just rounded slightly differently). Flagged rather than silently resolved: the POH's own MTOW (1111.30kg) differs from the earlier LTF summary sheet's 1113kg by 1.7kg — almost certainly just a rounding choice in how that sheet was prepared, but the POH is the actual certificated document, so its figure is used. New capability: utility category requires the baggage compartment and rear seat to be completely unoccupied, not just under a lower limit — a genuinely different constraint from anything the app had before. Built requiredEmptyStations to handle this generically (any category can require any stations to read zero), verified with isolated tests: identical light loading passes with rear seat empty, fails with it occupied under utility category, and passes again under normal category with the same occupied rear seat — confirming the rule is genuinely category-specific, not just cosmetic. VH-SYH/LWX/LXA/UOR still correctly show 'no data yet' on the real file — maxFuelL (tank capacity in litres) is the one remaining gap, genuinely not given anywhere yet (every source so far has only a blank fuel-litres field to fill in per flight, not a stated capacity). C172S unchanged — still fully pending, needs its own equivalent Section 2 Limitations document."},
+  {v:"v0.84.0",d:"Maintenance page unlocked — MAINT_SUSPENDED flipped to false. Verified with mocked live data: [LIVE] checker state, real fleet tiles rendering, MAINT_KNOWN_AIRCRAFT correctly resolving every aircraft's real type (including the C172S/C172R split from last round) now actually flowing through to the live UI, not just checked in isolation. Confirmed the graceful real-world fallback still holds too — with the actual proxy unreachable from this sandbox, drops back to the 18-tile baseline cleanly, no errors."},
+  {v:"v0.83.0",d:"C172 split into C172S and C172R — real MTOW confirmed genuinely different (1113kg vs 1157kg) from the official LTF PDFs (C172R W&B v2.1, C172S W&B v2.0), so the round-88 merge was reversed rather than left wrong. Both baggage limits now real (54.5kg/22.7kg individually) plus a new kind of check this app didn't have before: a COMBINED cap across both compartments (54.5kg total, tighter than the sum of the two individual limits would allow) — tested by temporarily injecting a fake envelope in an isolated browser session (never touching the shipped file) to prove the logic actually catches an over-combined-but-under-individual loading before trusting it. Fuel density now real (0.72 kg/L) for both. Updated/added real per-tail BEW/arm for every C172 in the fleet, including VH-LXA (was null) and VH-LWX's corrected BEW (756.6kg, the newer official PDF superseding the earlier xlsx's 756kg). Added VH-FPV — appears with matching figures in two independent official LTF documents, but wasn't in the live FlightLogger fleet pull captured earlier; included with that discrepancy flagged, not silently resolved either way. The CG envelope is still the one real gap: both PDFs give it as a chart image, not a data table. Actually attempted extraction this round rather than just noting the gap again — confirmed no vector data exists (checked directly), then ran real pixel/line-detection (OpenCV Hough transform) against the higher-resolution C172S chart. Got real candidate lines but no way to cross-check them the way the Decathlon's tabular data could be verified against its own worked example, so left null rather than ship an unverifiable safety figure."},
+  {v:"v0.82.0",d:"Real W&B data added for the Decathlon and a new Cessna 172 type, from POH spreadsheets (SuperDecathlonW_B.xlsx, C172_Weight_and_Balance.xlsx). Decathlon: fully real now — stations, fuel arm/density, and both normal (884.52kg MTOW) and aerobatic (816.48kg MTOW) category envelopes, all from the source's TCDS limits table. Verified end-to-end against the source's own worked example — reproduced its ZFW (784.7kg/323532.2 moment) and TOW (820.2kg/422.675 arm/346678.2 moment) exactly, digit for digit. VH-AAZ and VH-UPG now show real computed W&B instead of the pending state. C172 added as a new type (S and R share identical station arms in the source, so one entry, not a split) — real stations, fuel arm, and per-tail BEW/arm for VH-SYH/VH-LWX/VH-UOR, but MTOW and the CG envelope are genuinely not given anywhere in the source (its own embedded chart doesn't reference the extra columns that looked like they might be envelope points, so left as pending rather than guessed) — every C172 tail correctly still shows 'no data yet', including the three with real BEW/arm, since the envelope is what's actually missing. Added three more real C172 fleet members (VH-KOT, VH-LXA, VH-ZDV) with honest nulls — confirmed real registrations, no tail-specific figures given. Fuel density (kg/L) moved from a single global constant to per-type, since the Decathlon's real figure (0.71) genuinely differs from the DA40's existing one — DA40's value unchanged. Added a per-type arm-unit label so the loading-sheet hint doesn't claim 'metres' for types that aren't in metres."},
+  {v:"v0.81.0",d:"Solo Signout's W&B and Fuel Plan pages are now fully generic across aircraft types — no more hardcoded single-type assumptions. Added AIRCRAFT_TYPES, a data-driven schema covering seating layout, loadable stations and their arms, weight/CG limits per operating category (most types have one 'normal' category; aerobatic types can have a second 'aerobatic' category with its own tighter limits), and fuel power-setting presets. The DA40's real figures were migrated in unchanged — verified byte-for-byte identical output before/after (same BEW/arm/moment/TOW/CG numbers, same checks). Added the American Champion 8KCAB Super Decathlon as a second type (VH-AAZ, VH-UPG — both real registrations, confirmed against the live FlightLogger fleet pull) with tandem-seat station labels and a normal/aerobatic category selector, but every numeric figure is explicitly null, not estimated — selecting a Decathlon shows a clear 'no data yet, do not use for signout' state instead of computing with placeholder numbers. Fuel Plan's power-setting dropdown (previously hardcoded to the DA40's 55%/75% SOP figures) now builds itself from whichever type is selected, and correctly disables with an honest message when a type has no burn-rate data yet. Maintenance's fleet-tile type labels also corrected to use each aircraft's real type instead of an assumed 'DA40' for everything in FLEET."},
   {v:"v0.80.0",d:"Maintenance page re-suspended — MAINT_SUSPENDED flipped back to true. Watermark and grey-out are back, live fetches stop (including Part 1's live maintenanceParts data from last round — falls back to its static 17-item template cleanly, no errors), tiles unclickable again. Same single flag as always."},
   {v:"v0.79.0",d:"Part 1 of the Maintenance Release now populates from real, live FlightLogger data — the maintenanceParts permission wall from earlier in the project is gone with the new API key. FlightLogger keeps the full history of every recurring requirement (e.g. '50 HOUR' gets a new record roughly every 50 flight hours as it's completed and rescheduled), so this dedupes down to the current instance of each named item before rendering — confirmed against VH-KAI's real data: LYCOMING 50 HOUR/DIAMOND 50 HOUR/etc. all correctly show 8403.3 hrs, 100 HOUR/ANNUAL shows 8453.3 hrs, both matching figures already verified earlier in this project. Status (APPROVED/EXPIRED) shown as FlightLogger states it, not relabelled — 'EXPIRED' here means the nominal due-point has passed, which isn't automatically the same as grounded. Degrades cleanly: if the live fetch fails, the static 17-item template stays exactly as it was, with a note explaining why. Part 2 (endorsements) and Part 3 (daily log) are unchanged — those are CASA-paper-specific concepts with no equivalent in FlightLogger's data model, confirmed by reviewing its full field list; not a permission gap, a genuine domain mismatch."},
   {v:"v0.78.0",d:"Maintenance Release template restyled to emulate the real CASA form's look — off-white paper background, red rules/borders, red section headers, matching the government form's printed aesthetic instead of the app's dark theme (deliberate scoped exception, same pattern as YMMB's own visual identity). Also populated the values that were clearly legible/printed in the photographed VH-XPP document: all 14 Part 1 header fields except 'Signed' (that specific signature was illegible, left blank rather than guessed), all three IFR/VFR Night/VFR Day boxes ticked (matching the original), the full 17-item Part 1 maintenance-requirements table, and Part 2's two endorsement descriptions (text only — signature/licence/date columns left blank since those specific handwritten entries weren't clearly legible). Part 3 (the daily inspection log) stays an empty template — that section had the most illegible handwriting in the source photos, so nothing was transcribed there rather than risk guessing at a compliance record."},
@@ -1757,8 +2235,34 @@ $("#changelogList").innerHTML=CHANGELOG.map(c=>`<li style="padding:var(--u2) 0">
 
 
 const acSel=$("#ac");
-acSel.innerHTML=FLEET.map(f=>`<option>${f.reg}</option>`).join("");
-["#ac","#front","#rear","#bag","#fuel"].forEach(s=>$(s).addEventListener("input",calcWB));
+acSel.innerHTML=FLEET.map(f=>`<option value="${f.reg}">${f.reg} — ${AIRCRAFT_TYPES[f.type].name}</option>`).join("");
+
+// Builds the station (seats/baggage/etc.) input fields and the category
+// selector for whichever aircraft is currently selected — generic over any
+// entry in AIRCRAFT_TYPES, not hardcoded to one layout. Called whenever the
+// aircraft selection changes; a single delegated "input" listener on the
+// container (attached once, below) handles every rebuild without needing to
+// re-attach per-field listeners each time.
+function buildWbFields(acType){
+  $("#stationFields").innerHTML=acType.stations.map(st=>{
+    const hintId=`station-${st.id}-hint`;
+    return `<label class="f"><span>${st.label} (kg)</span><input id="station-${st.id}" type="number" value="${st.default}">${st.limit!=null?`<div class="hint" id="${hintId}"></div>`:""}</label>`;
+  }).join("");
+  const catKeys=Object.keys(acType.categories);
+  $("#categoryField").style.display=catKeys.length>1?"":"none";
+  if(catKeys.length>1){
+    $("#category").innerHTML=catKeys.map(k=>`<option value="${k}">${k[0].toUpperCase()+k.slice(1)}</option>`).join("");
+  }
+}
+
+["#ac","#category","#fuel"].forEach(s=>$(s).addEventListener("input",()=>{
+  if(s==="#ac"){ buildWbFields(AIRCRAFT_TYPES[FLEET.find(f=>f.reg===acSel.value).type]); }
+  calcWB();
+}));
+// Delegated listener: catches input events from any dynamically-generated
+// station field, without needing to re-attach one per rebuild.
+$("#stationFields").addEventListener("input",calcWB);
+buildWbFields(AIRCRAFT_TYPES[FLEET.find(f=>f.reg===acSel.value).type]);
 
 // W&B's "Fuel (litres)" and the Fuel Plan's "Endurance" litres both represent
 // the same real-world quantity — actual fuel on board at start-up — so keep
@@ -1772,37 +2276,120 @@ $("#fuel").addEventListener("input",()=>{
 const ICON_CHECK='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 const ICON_CROSS='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 const chk=(ok,l)=>`<div class="chk"><span class="i" style="color:${ok?'var(--green)':'var(--red)'}">${ok?ICON_CHECK:ICON_CROSS}</span><span style="color:${ok?'var(--text)':'var(--red)'}">${l}</span></div>`;
+
 function calcWB(){
   const ac=FLEET.find(f=>f.reg===acSel.value);
-  $("#acHint").textContent=`BEW ${ac.bew} kg · arm ${ac.arm} m`;
-  const f=+$("#front").value||0,r=+$("#rear").value||0,b=+$("#bag").value||0;
-  const acMaxFuelKg=ac.maxFuelL*FUEL_KG_PER_L;
-  const fuelKg=Math.min((+$("#fuel").value||0)*FUEL_KG_PER_L,acMaxFuelKg);
+  const acType=AIRCRAFT_TYPES[ac.type];
+  const catKeys=Object.keys(acType.categories);
+  const catKey=catKeys.length>1?($("#category").value||catKeys[0]):catKeys[0];
+  const cat=acType.categories[catKey];
+
+  // Honest "no data yet" state — checked before any math runs, not after.
+  // A type flagged pending, or missing bew/arm/fuel-arm/mtow/envelope, means
+  // there's nothing real to compute yet. Show that plainly rather than
+  // silently producing NaN or (worse) a plausible-looking wrong answer.
+  const stationsReady=acType.stations.every(st=>st.arm!=null);
+  const dataReady=acType.dataStatus!=="pending" && ac.bew!=null && ac.arm!=null && ac.maxFuelL!=null
+    && acType.fuel.arm!=null && acType.fuel.kgPerL!=null && cat.mtow!=null && cat.envelope!=null && stationsReady;
+
+  if(!dataReady){
+    $("#acHint").textContent=`No W&B data yet for ${acType.name} (${ac.reg}) — figures pending.`;
+    $("#wbTable").innerHTML=`<tbody><tr><td colspan="4" class="hint" style="padding:var(--u4) 0">No verified W&B data is available for this aircraft type yet. Nothing is estimated or computed until real POH/W&B figures are entered.</td></tr></tbody>`;
+    $("#wbChecks").innerHTML="";
+    $("#env").innerHTML="";
+    $("#workingOutBlock").style.display="none";
+    $("#workingOutBlock").removeAttribute("open");
+    $("#verdict").style.borderColor="rgba(139,150,172,.35)";
+    $("#verdict").style.background="rgba(139,150,172,.08)";
+    $("#verdict").innerHTML=`<div class="vdot" style="background:var(--dim)"></div>
+      <div><div class="vlabel" style="color:var(--dim)">NO DATA YET</div>
+      <div class="vsub">${acType.name} — W&B figures not yet entered for this type. Do not use for signout until real data is added.</div></div>
+      <button class="vbtn" style="opacity:.4;cursor:not-allowed" disabled>Instructor confirm →</button>`;
+    return;
+  }
+
+  $("#acHint").textContent=`BEW ${ac.bew} kg · arm ${ac.arm} ${acType.armUnit||""}`;
+  const stationVals={};
+  acType.stations.forEach(st=>{ stationVals[st.id]=+$(`#station-${st.id}`).value||0; });
+  const acMaxFuelKg=ac.maxFuelL*acType.fuel.kgPerL;
+  const fuelKg=Math.min((+$("#fuel").value||0)*acType.fuel.kgPerL,acMaxFuelKg);
   $("#fuelHint").textContent=`${fuelKg.toFixed(1)} kg · max ${ac.maxFuelL} L usable on ${ac.reg}`;
-  $("#bagHint").textContent=b>LIM.bag?`Over max ${LIM.bag} kg`:"";
-  $("#bagHint").style.color=b>LIM.bag?"var(--red)":"var(--dim)";
-  const rows=[["Basic Empty Weight",ac.bew,ac.arm],["Front Seats",f,ARMS.front],["Rear Seats",r,ARMS.rear],["Baggage",b,ARMS.bag]];
+
+  // Any station with a defined limit (not just baggage specifically — generic
+  // over whatever the type defines) gets its own over-limit hint AND its own
+  // checklist line — collapsing multiple limits into one pass/fail hides
+  // which specific one failed, which matters once a type has more than one
+  // (the C172's two baggage compartments plus their combined cap, below).
+  let limitChecks=true;
+  const stationLimitChecks=[];
+  acType.stations.forEach(st=>{
+    if(st.limit==null) return;
+    const hintEl=$(`#station-${st.id}-hint`);
+    const over=stationVals[st.id]>st.limit;
+    if(over) limitChecks=false;
+    stationLimitChecks.push({label:`${st.label} ≤ ${st.limit} kg`,ok:!over});
+    if(hintEl){
+      hintEl.textContent=over?`Over max ${st.limit} kg`:"";
+      hintEl.style.color=over?"var(--red)":"var(--dim)";
+    }
+  });
+  // Combined limits — a cap across a GROUP of stations, on top of (not
+  // instead of) each station's own individual limit. E.g. the C172's two
+  // baggage compartments each have their own max, but forward+aft combined
+  // is capped lower than the sum of the two individual limits would allow.
+  const combinedChecks=[];
+  (acType.combinedLimits||[]).forEach(cl=>{
+    const total=cl.stationIds.reduce((s,id)=>s+(stationVals[id]||0),0);
+    const over=total>cl.limit;
+    if(over) limitChecks=false;
+    combinedChecks.push({label:`${cl.label} ≤ ${cl.limit} kg`,ok:!over});
+  });
+  // Required-empty stations — a category can require certain stations to be
+  // genuinely unoccupied (not just under some lower limit), e.g. the C172's
+  // utility category requiring baggage and rear seat empty. Checked
+  // separately from limitChecks since "must be zero" isn't the same kind of
+  // constraint as "must be under N kg", even though both block the pass.
+  const emptyChecks=[];
+  (cat.requiredEmptyStations||[]).forEach(stId=>{
+    const st=acType.stations.find(s=>s.id===stId);
+    if(!st) return;
+    const occupied=(stationVals[stId]||0)>0;
+    if(occupied) limitChecks=false;
+    emptyChecks.push({label:`${st.label} empty (required in ${catKey})`,ok:!occupied});
+  });
+
+  const rows=[["Basic Empty Weight",ac.bew,ac.arm]];
+  acType.stations.forEach(st=>{ rows.push([st.label,stationVals[st.id],st.arm]); });
   let zfw=0,zfwM=0; rows.forEach(x=>{x.push(x[1]*x[2]);zfw+=x[1];zfwM+=x[3];});
-  const fuelM=fuelKg*ARMS.fuel,tow=zfw+fuelKg,towM=zfwM+fuelM,cg=towM/tow;
-  const ch={mtow:tow<=LIM.mtow,bag:b<=LIM.bag,fuel:fuelKg<=acMaxFuelKg+.01,env:inEnv(tow,cg)};
+  const fuelM=fuelKg*acType.fuel.arm,tow=zfw+fuelKg,towM=zfwM+fuelM,cg=towM/tow;
+  const ch={mtow:tow<=cat.mtow,limits:limitChecks,fuel:fuelKg<=acMaxFuelKg+.01,env:inEnv(tow,cg,cat.envelope)};
   const pass=Object.values(ch).every(Boolean);
   $("#wbTable").innerHTML=`<thead><tr><th>Item</th><th class="num">Wt</th><th class="num">Arm</th><th class="num">Moment</th></tr></thead><tbody>
     ${rows.map(x=>`<tr><td>${x[0]}</td><td class="num">${x[1].toFixed(1)}</td><td class="num">${x[2].toFixed(3)}</td><td class="num">${x[3].toFixed(1)}</td></tr>`).join("")}
     <tr class="sub"><td class="bold">Zero Fuel Weight</td><td class="num bold">${zfw.toFixed(1)}</td><td class="num">—</td><td class="num bold">${zfwM.toFixed(1)}</td></tr>
-    <tr><td>Fuel</td><td class="num">${fuelKg.toFixed(1)}</td><td class="num">${ARMS.fuel.toFixed(2)}</td><td class="num">${fuelM.toFixed(1)}</td></tr>
+    <tr><td>Fuel</td><td class="num">${fuelKg.toFixed(1)}</td><td class="num">${acType.fuel.arm.toFixed(2)}</td><td class="num">${fuelM.toFixed(1)}</td></tr>
     <tr class="tot"><td class="bold">Take-off Weight</td><td class="num bold">${tow.toFixed(1)}</td><td class="num bold">${cg.toFixed(3)}</td><td class="num bold">${towM.toFixed(1)}</td></tr></tbody>`;
-  $("#wbChecks").innerHTML=chk(ch.mtow,`TOW ≤ ${LIM.mtow} kg`)+chk(ch.bag,`Baggage ≤ ${LIM.bag} kg`)+chk(ch.fuel,`Fuel ≤ ${ac.maxFuelL} L usable (${ac.reg})`)+chk(ch.env,"CG within envelope");
+  const limitLines=[...stationLimitChecks,...combinedChecks,...emptyChecks].map(c=>chk(c.ok,c.label)).join("");
+  $("#wbChecks").innerHTML=chk(ch.mtow,`TOW ≤ ${cat.mtow} kg`)+limitLines+chk(ch.fuel,`Fuel ≤ ${ac.maxFuelL} L usable (${ac.reg})`)+chk(ch.env,"CG within envelope");
   drawEnv({
     empty:{w:ac.bew, a:ac.arm, label:"Empty"},
     zfw:{w:zfw, a:zfw?zfwM/zfw:ac.arm, label:"ZFW"},
     tow:{w:tow, a:cg, label:"TOW"},
-  },pass);
+  },pass,cat.envelope);
+  const workingOutEl=$("#workingOutBlock");
+  if(cat.workingOut){
+    workingOutEl.style.display="";
+    $("#workingOutBody").innerHTML=cat.workingOut;
+  }else{
+    workingOutEl.style.display="none";
+    workingOutEl.removeAttribute("open");
+  }
   const col=pass?"var(--green)":"var(--red)";
   $("#verdict").style.borderColor=pass?"rgba(34,197,94,.35)":"rgba(242,85,76,.4)";
   $("#verdict").style.background=pass?"rgba(34,197,94,.08)":"rgba(242,85,76,.08)";
   $("#verdict").innerHTML=`<div class="vdot" style="background:${col}"></div>
     <div><div class="vlabel" style="color:${col}">${pass?"WITHIN LIMITS":"OUT OF LIMITS"}</div>
-    <div class="vsub">${pass?"Within DA40 limits. Instructor confirms independently before authorising solo.":"Fails one or more checks — do not authorise until corrected."}</div></div>
+    <div class="vsub">${pass?`Within ${acType.name} limits. Instructor confirms independently before authorising solo.`:"Fails one or more checks — do not authorise until corrected."}</div></div>
     <button class="vbtn" ${pass?"":'style="opacity:.4;cursor:not-allowed" disabled'}>Instructor confirm →</button>`;
 }
 function declutter(vals,minGap){
@@ -1815,8 +2402,14 @@ function declutter(vals,minGap){
   }
   return out;
 }
-function drawEnv(pts,pass){
-  const P={x0:2.36,x1:2.63,y0:760,y1:1220,w:300,h:250,ox:60,oy:10};
+function drawEnv(pts,pass,envelope){
+  // Chart scale computed from the envelope's own bounds (plus a little
+  // padding) rather than fixed constants — works for any type's arm/weight
+  // range, not just the DA40's.
+  const arms=envelope.map(p=>p.a), weights=envelope.map(p=>p.w);
+  const aMin=Math.min(...arms), aMax=Math.max(...arms), wMin=Math.min(...weights), wMax=Math.max(...weights);
+  const aPad=(aMax-aMin)*0.12||0.02, wPad=(wMax-wMin)*0.12||20;
+  const P={x0:aMin-aPad,x1:aMax+aPad,y0:wMin-wPad,y1:wMax+wPad,w:300,h:250,ox:60,oy:10};
   const px=a=>P.ox+((a-P.x0)/(P.x1-P.x0))*P.w,py=w=>P.oy+P.h-((w-P.y0)/(P.y1-P.y0))*P.h;
   const NUMFONT="'Geist Mono','JetBrains Mono',ui-monospace,monospace";
   const order=["empty","zfw","tow"];
@@ -1828,9 +2421,16 @@ function drawEnv(pts,pass){
   $("#envPanel").classList.toggle("envfail",!pass);
 
   let g=`<rect x="0" y="0" width="420" height="300" fill="${bgFill}"/>`;
-  [800,900,1000,1100,1200].forEach(w=>{g+=`<line x1="${P.ox}" y1="${py(w)}" x2="${P.ox+P.w}" y2="${py(w)}" stroke="rgba(255,255,255,.06)"/>`;});
-  [2.40,2.45,2.50,2.55,2.60].forEach(a=>{g+=`<line x1="${px(a)}" y1="${P.oy}" x2="${px(a)}" y2="${P.oy+P.h}" stroke="rgba(255,255,255,.06)"/>`;});
-  const poly=ENV.map(p=>`${px(p.a).toFixed(1)},${py(p.w).toFixed(1)}`).join(" ");
+  // Gridlines: 5 evenly-spaced lines across the computed range, works for any type.
+  for(let i=0;i<=4;i++){
+    const w=P.y0+(P.y1-P.y0)*i/4;
+    g+=`<line x1="${P.ox}" y1="${py(w)}" x2="${P.ox+P.w}" y2="${py(w)}" stroke="rgba(255,255,255,.06)"/>`;
+  }
+  for(let i=0;i<=4;i++){
+    const a=P.x0+(P.x1-P.x0)*i/4;
+    g+=`<line x1="${px(a)}" y1="${P.oy}" x2="${px(a)}" y2="${P.oy+P.h}" stroke="rgba(255,255,255,.06)"/>`;
+  }
+  const poly=envelope.map(p=>`${px(p.a).toFixed(1)},${py(p.w).toFixed(1)}`).join(" ");
   const envFill=pass?"rgba(36,168,216,.10)":"rgba(242,85,76,.14)";
   const envStroke=pass?"#24a8d8":"#f2554c";
 
@@ -1915,10 +2515,13 @@ const CONVERTIBLE_ROWS=["trip","alt","cont","reserve","hold","disc"];
 // flight — their actual figures always take over once present, same as
 // everywhere else in this app that prefers real entered data over an
 // assumed default.
-const POWER_SETTING_USGPERHR={55:8.5, 75:11};
 function defaultBurnLPerMin(){
-  const pct=+$("#fpPowerSetting")?.value||55;
-  return (POWER_SETTING_USGPERHR[pct]||POWER_SETTING_USGPERHR[55])*3.78541/60;
+  const ac=FLEET.find(f=>f.reg===fpAcSel.value);
+  const acType=AIRCRAFT_TYPES[ac.type];
+  const pctVal=$("#fpPowerSetting")?.value;
+  if(!acType.powerSettings||!acType.powerSettings.length||!pctVal) return null; // no real rate to assume — caller must handle
+  const ps=acType.powerSettings.find(p=>String(p.pct)===String(pctVal))||acType.powerSettings.find(p=>p.default)||acType.powerSettings[0];
+  return ps.burnUSGH*3.78541/60;
 }
 function subTotalBurnRate(excludeKey){
   // Same rate the Margin/Endurance chain already uses: Sub-Total litres ÷
@@ -1975,11 +2578,24 @@ $("#fpTable").addEventListener("click",e=>{
   row.classList.remove("fp-row-disabled");
   row.querySelectorAll("input").forEach(inp=>inp.readOnly=false);
 });
+function buildPowerSettings(acType){
+  const sel=$("#fpPowerSetting");
+  if(!acType.powerSettings||!acType.powerSettings.length){
+    sel.innerHTML=`<option value="">No power-setting data yet for ${acType.name}</option>`;
+    sel.disabled=true;
+    return;
+  }
+  sel.disabled=false;
+  sel.innerHTML=acType.powerSettings.map(ps=>
+    `<option value="${ps.pct}" ${ps.default?"selected":""}>${ps.label} (${ps.burnUSGH} USG/hr)</option>`
+  ).join("");
+}
 fpAcSel.addEventListener("change",()=>{
   // Reset Endurance-litres to this aircraft's usable fuel by default (actual fuel on board
   // at start-up per the handbook's step 6 — instructor can reduce if not filled to tabs).
   const ac=FLEET.find(f=>f.reg===fpAcSel.value);
-  $("#fp-endurance-l").value=ac.maxFuelL;
+  buildPowerSettings(AIRCRAFT_TYPES[ac.type]);
+  $("#fp-endurance-l").value=ac.maxFuelL??"";
   calcFuelPlan();
 });
 $("#fpPowerSetting").addEventListener("change",()=>{
