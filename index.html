@@ -950,12 +950,13 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 
     <section class="view" data-view="scheduling">
       <h1 class="title" style="margin-bottom:var(--u3)">Scheduling <span style="color:var(--faint); font-weight:700; font-size:14px">[PREVIEW]</span></h1>
-      <div class="hint" style="max-width:640px">Matches student availability, instructor duty hours and rules, and live fleet status to suggest training bookings — checked against overlaps and constraints automatically. <b>Suggest-only</b>: nothing books itself. Every match shown here needs to be confirmed by a person before it becomes a real booking. Not connected to FlightLogger yet — that's a separate, later step, and needs its own schema-verification work first, same as everything else in this app that talks to FlightLogger.</div>
+      <div class="hint" style="max-width:640px">Matches real student data against real live aircraft-booking conflicts to suggest training slots. <b>Suggest-only</b>: nothing books itself — every match needs a person to hit Confirm. Real progress, real gaps: aircraft conflicts are checked against live FlightLogger data; instructor duty times are a fixed 08:00–17:00 placeholder, not yet real; and the write path (actually creating a booking on Confirm) isn't connected yet — that needs FlightLogger's booking-input shape verified first, which hasn't happened. Confirming a real match right now tells you that plainly rather than pretending to succeed.</div>
 
       <div class="panel" style="margin-top:var(--u5)">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--u3)">
           <div class="plabel" style="margin-bottom:0">Suggested Matches</div>
           <div style="display:flex; gap:var(--u3)">
+            <button class="vbtn" id="schedRealBtn" style="margin-left:0; padding:6px 14px; font-size:12px">Generate real suggestions</button>
             <button class="vbtn" id="schedPreviewBtn" style="margin-left:0; padding:6px 14px; font-size:12px">Preview with sample data</button>
             <button class="vbtn" id="schedClearBtn" style="margin-left:0; padding:6px 14px; font-size:12px; display:none">Clear preview</button>
           </div>
@@ -1636,21 +1637,164 @@ const SCHED_SAMPLE_AIRCRAFT=[
   {reg:"[SAMPLE]-AAA",type:"DA40",existingBookings:[]},
   {reg:"[SAMPLE]-BBB",type:"C172R",existingBookings:[]},
 ];
-function renderSchedResults(matches,isSample){
+
+// ---- Real student data (round 101) ------------------------------------
+// From the LTF student mastersheet, pasted directly by the user in chat.
+// Snapshot dated below — this is a live-maintained document ("Updated by
+// Instructor Weekly" per its own header), not a one-time export, so this
+// is as-of-this-date, not permanently current. Re-paste to refresh.
+//
+// Two known gaps, not silently resolved:
+// 1. Instructor labels ("2N.Carpeggiani", "G2 - Kieran") are stored EXACTLY
+//    as given — the source itself mixes two different formats (FlightLogger-
+//    style short code vs "grade - first name"), and neither has been
+//    matched against a real FlightLogger User record yet (User's real
+//    fields are still pending from the round-100/101 introspection).
+//    Shown for context only — NOT used to check real instructor conflicts.
+// 2. aircraftTypesNeeded is an array, not a single type, because the source
+//    just says "C172" generically — doesn't specify R or S. Treated as
+//    "either is fine" rather than guessing one, since the source genuinely
+//    doesn't disambiguate.
+const REAL_STUDENTS_ASOF="16 Jul 2026";
+const REAL_STUDENTS=[
+  {id:"rs1",name:"Walker, Zane",program:"RPL",aircraftTypesNeeded:["DA40"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"G2 - Kieran",availableDays:["Sat","Sun"],totalHours:35.2,howOften:"1 - 3 times a month"},
+  {id:"rs2",name:"Leung, Kwong Chun (Harold)",program:"CPL1",aircraftTypesNeeded:["DA40"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"TBC",availableDays:["Sun","Sat","Tue"],totalHours:28,howOften:"1 - 2 times a week"},
+  {id:"rs3",name:"D'Cruz, Aaron",program:"RPL",aircraftTypesNeeded:["SLG2"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"G3 - Juntong",availableDays:["Sun","Sat"],totalHours:18.9,howOften:"1 - 3 times a month"},
+  {id:"rs4",name:"Ma, Hon To (Tony)",program:"PPL",aircraftTypesNeeded:["C172R","C172S"],primaryInstructor:"2N.Carpeggiani",secondaryInstructor:"TBC",availableDays:["Tue","Wed","Thu","Fri","Sat"],totalHours:27,howOften:"1 - 3 times a month"},
+  {id:"rs5",name:"Pallikunnath-Shoby, Edwin",program:"RPL",aircraftTypesNeeded:["C172R","C172S"],primaryInstructor:"G2 - Alex C",secondaryInstructor:"2N.Carpeggiani",availableDays:["Tue"],totalHours:21.5,howOften:"1 - 2 times a week"},
+  {id:"rs6",name:"Rogers, Matthew",program:"RPL",aircraftTypesNeeded:["SLG2"],primaryInstructor:"G2 - Ian",secondaryInstructor:"G3 - Alex A",availableDays:[],totalHours:33.9,howOften:null,note:"Awaiting availability from student"},
+];
+
+// Fixed operating assumptions, per explicit instruction (round 101) — not
+// yet pulling real per-instructor DutyTime or adding brief/debrief buffers.
+const SCHED_DUTY_START="08:00", SCHED_DUTY_END="17:00";
+const SCHED_LESSON_MINUTES=120;
+const SCHED_DAY_NAMES=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]; // matches Date.getDay() index
+
+// Next `maxDates` calendar dates (YYYY-MM-DD, starting tomorrow — same-day
+// booking urgency isn't handled yet) that fall on one of the given
+// day-of-week abbreviations, searching up to `withinDays` ahead.
+function nextDatesForDays(dayAbbrevs,maxDates,withinDays){
+  const dates=[];
+  const now=new Date();
+  for(let i=1;i<=withinDays && dates.length<maxDates;i++){
+    const d=new Date(now.getTime()+i*86400000);
+    if(dayAbbrevs.includes(SCHED_DAY_NAMES[d.getDay()])) dates.push(d.toISOString().slice(0,10));
+  }
+  return dates;
+}
+
+// Real-data matching: fixed duty window + fixed lesson length + REAL
+// aircraft-booking conflicts (fetched live from FlightLogger via the proxy).
+// Deliberately does NOT check real instructor conflicts — that needs a
+// resolved instructor identity this app doesn't have yet (see the gap note
+// above). Every suggestion carries instructorVerified:false so the UI can
+// show that caveat plainly rather than imply a fuller check happened.
+function generateRealSuggestions(students,realAircraftBookingsByReg){
+  const suggestions=[];
+  students.forEach(student=>{
+    if(!student.availableDays.length) return; // e.g. Matthew Rogers — genuinely nothing to match against yet
+    const dates=nextDatesForDays(student.availableDays,2,21);
+    dates.forEach(date=>{
+      const candidateTails=FLEET.filter(f=>student.aircraftTypesNeeded.includes(f.type));
+      for(const ac of candidateTails){
+        const dayBookings=(realAircraftBookingsByReg[ac.reg]||[])
+          .filter(b=>b.startsAt.slice(0,10)===date)
+          .map(b=>({start:b.startsAt.slice(11,16),end:b.endsAt.slice(11,16)}));
+        const free=subtractBookings(SCHED_DUTY_START,SCHED_DUTY_END,dayBookings);
+        const slot=free.find(f=>timeToMinutes(f.end)-timeToMinutes(f.start)>=SCHED_LESSON_MINUTES);
+        if(!slot) continue;
+        const slotEnd=minutesToTime(timeToMinutes(slot.start)+SCHED_LESSON_MINUTES);
+        suggestions.push({
+          studentId:student.id, studentName:student.name,
+          primaryInstructor:student.primaryInstructor, secondaryInstructor:student.secondaryInstructor,
+          aircraftReg:ac.reg, date, start:slot.start, end:slotEnd,
+          instructorVerified:false,
+        });
+        break; // one suggestion per date is enough — don't enumerate every tail
+      }
+    });
+  });
+  return suggestions;
+}
+
+async function fetchRealAircraftBookings(){
+  const from=new Date().toISOString();
+  const to=new Date(Date.now()+22*86400000).toISOString();
+  const res=await fetch(`${FLIGHTLOGGER_PROXY}/bookings-range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  if(!res.ok) throw new Error(`bookings-range fetch failed: ${res.status}`);
+  const flat=await res.json();
+  const byReg={};
+  flat.forEach(b=>{ (byReg[b.aircraft]=byReg[b.aircraft]||[]).push(b); });
+  return byReg;
+}
+
+let schedCurrentMatches=[]; // whatever's currently rendered, looked up by row index when Confirm is clicked
+function renderSchedResults(matches,mode){
+  // mode: "sample" | "real"
+  schedCurrentMatches=matches;
   const el=$("#schedResults");
   if(!matches.length){
     el.innerHTML=`<div class="hint" style="padding:var(--u4) 0">No matches found for this data.</div>`;
     return;
   }
-  const banner=isSample?`<div class="hint" style="color:var(--amber); margin-bottom:var(--u3)">Preview using [SAMPLE] data — not real students or instructors. Clear this before using with anything real.</div>`:"";
-  el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Window</th><th class="num">Length</th></tr></thead><tbody>
-    ${matches.map(m=>`<tr><td>${m.studentName}</td><td>${m.instructorName}</td><td>${m.aircraftReg}</td><td>${m.start}–${m.end}</td><td class="num">${m.minutesLong} min</td></tr>`).join("")}
-  </tbody></table>`;
+  if(mode==="sample"){
+    const banner=`<div class="hint" style="color:var(--amber); margin-bottom:var(--u3)">Preview using [SAMPLE] data — not real students or instructors. Clear this before using with anything real.</div>`;
+    el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Window</th><th class="num">Length</th><th></th></tr></thead><tbody>
+      ${matches.map((m,i)=>`<tr><td>${m.studentName}</td><td>${m.instructorName}</td><td>${m.aircraftReg}</td><td>${m.start}–${m.end}</td><td class="num">${m.minutesLong} min</td>
+        <td><button class="vbtn sched-confirm-btn" style="margin-left:0; padding:4px 10px; font-size:11px" data-idx="${i}" data-mode="sample">Confirm</button></td></tr>`).join("")}
+    </tbody></table>`;
+  }else{
+    const banner=`<div class="hint" style="margin-bottom:var(--u3)">Real students, real aircraft-booking conflicts checked live. Fixed 08:00–17:00 window, fixed 2-hour lessons — not yet using real per-instructor duty times. <span style="color:var(--amber)">Instructor availability is NOT verified against live data yet</span> — confirm with the instructor directly before locking anything in.</div>`;
+    el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Primary / Secondary Instructor</th><th>Aircraft</th><th>Date</th><th>Window</th><th></th></tr></thead><tbody>
+      ${matches.map((m,i)=>`<tr><td>${m.studentName}</td><td>${m.primaryInstructor} / ${m.secondaryInstructor}</td><td>${m.aircraftReg}</td><td>${m.date}</td><td>${m.start}–${m.end}</td>
+        <td><button class="vbtn sched-confirm-btn" style="margin-left:0; padding:4px 10px; font-size:11px" data-idx="${i}" data-mode="real">Confirm</button></td></tr>`).join("")}
+    </tbody></table>`;
+  }
 }
+// Delegated so it works for both sample and real rows without re-attaching
+// per render. Sample: demonstrates the confirm flow itself, no network call
+// (it's fake data — there's nothing real to write). Real: does NOT fire a
+// guessed mutation against production. SingleStudentBookingInput's real
+// shape isn't confirmed yet (pending round 101's schema check) — writing
+// against a guessed shape risks creating a malformed real booking, which is
+// a different order of risk than a guessed read query. Says so plainly
+// rather than pretending success or silently doing nothing.
+$("#schedResults").addEventListener("click",(e)=>{
+  const btn=e.target.closest(".sched-confirm-btn"); if(!btn) return;
+  const m=schedCurrentMatches[+btn.dataset.idx];
+  if(btn.dataset.mode==="sample"){
+    btn.textContent="Confirmed (demo)";
+    btn.disabled=true;
+    btn.style.opacity=".5";
+    return;
+  }
+  btn.textContent="Not yet connected";
+  btn.disabled=true;
+  btn.style.opacity=".5";
+  btn.insertAdjacentHTML("afterend",`<div class="hint" style="color:var(--amber); margin-top:4px">No booking was created. The real write path (createSingleStudentBooking) needs its input shape verified first — see the Home page changelog. This match is otherwise real: ${m.studentName}, ${m.aircraftReg}, ${m.date} ${m.start}–${m.end}.</div>`);
+});
 $("#schedPreviewBtn").addEventListener("click",()=>{
   const matches=generateSuggestedMatches(SCHED_SAMPLE_STUDENTS,SCHED_SAMPLE_INSTRUCTORS,SCHED_SAMPLE_AIRCRAFT);
-  renderSchedResults(matches,true);
+  renderSchedResults(matches,"sample");
   $("#schedClearBtn").style.display="";
+});
+$("#schedRealBtn").addEventListener("click",async()=>{
+  const btn=$("#schedRealBtn");
+  const originalText=btn.textContent;
+  btn.textContent="Checking live bookings…";
+  btn.disabled=true;
+  try{
+    const byReg=await fetchRealAircraftBookings();
+    const matches=generateRealSuggestions(REAL_STUDENTS,byReg);
+    renderSchedResults(matches,"real");
+    $("#schedClearBtn").style.display="";
+  }catch(err){
+    $("#schedResults").innerHTML=`<div class="hint" style="color:var(--red); padding:var(--u4) 0">Couldn't fetch live booking data (${err.message}). Nothing was matched — not falling back to a guess.</div>`;
+  }finally{
+    btn.textContent=originalText;
+    btn.disabled=false;
+  }
 });
 $("#schedClearBtn").addEventListener("click",()=>{
   $("#schedResults").innerHTML=`<div class="hint" style="padding:var(--u4) 0">No student, instructor, or availability data yet — nothing to match against. The matching logic itself is built and tested (see the Home page changelog), just waiting on real data to run against.</div>`;
@@ -1664,7 +1808,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.92.0";
+const VERSION="v0.93.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2304,6 +2448,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.93.0",d:"Scheduling module: real students, real aircraft-conflict checking, real Confirm-button flow — genuine progress, not just UI. Added a new permanent proxy endpoint (/bookings-range) returning real bookings for aircraft-conflict checking, live-tested with a mocked conflict scenario that proved the engine correctly falls through to a different tail when the first one's fully booked. 6 real students imported from the actual mastersheet (dated 16 Jul 2026) — day-of-week availability, not time windows, which needed a genuine engine redesign, not just a data swap: fixed 08:00-17:00 duty window and fixed 2-hour lessons, both per explicit instruction, real instructor duty times not wired yet. Matthew Rogers (no availability data in the source) correctly produces zero suggestions rather than a guess. Two known gaps recorded rather than papered over: instructor conflicts aren't checked against live data yet (every real suggestion says so plainly), and 'C172' in the source doesn't specify R or S, so it's treated as either rather than guessed. The Confirm button is real and honest, not a stub: on sample data it demonstrates the full click-to-confirm flow; on real data it explicitly refuses to fire a guessed mutation and says exactly why — SingleStudentBookingInput's real shape still isn't confirmed, and a wrong guess there risks creating a malformed real booking, a different order of risk than a bad read query. Also shipped this round: the proxy's SingleStudentBookingInput/User/Program/ProgramRevision introspection, for whenever that schema check comes back."},
   {v:"v0.92.0",d:"New Scheduling tab — groundwork for the student/instructor/aircraft auto-matching module (separate, broader than the existing Circuit Booking roadmap item). The actual matching engine is real and tested, not just scaffolding: time-overlap detection, booking subtraction (splits an available window around existing bookings), instructor daily-flight limits, per-instructor custom rules, and a minimum-lesson-duration filter — 11 unit tests, all passing, run in isolation with Node before any of it went into the app. One genuine design question the tests surfaced and answered: rules evaluate the whole candidate window as a single slot rather than trimming it to fit — a window that starts too early gets rejected outright, not silently shifted to a time the tool invented. Suggest-only, as agreed: nothing in this module writes to FlightLogger or creates a real booking — that's explicitly a separate, later step needing its own schema-verification round first. Added a 'Preview with sample data' button so the working engine is visible now, clearly labelled [SAMPLE] throughout and easy to clear — not a stand-in for real data, just proof the logic works before real student/instructor data arrives. Gated behind the same 6-click mechanism as every other non-Home/Solo-Signout tab."},
   {v:"v0.91.0",d:"Aircraft selection now stays in sync between W&B and Fuel Plan — pick a tail in either one, the other reflects it immediately, including its actual computed state (not just the dropdown), even before switching to that page. Guarded the same way the existing fuel-litres sync already was, so there's no risk of a feedback loop between the two. Nav Map: C172 routes now default each leg's TAS to N0110 (110kn), Sling 2 routes (once any exist — none do yet) will default to N0100 (100kn) — both stated directly, not found in the LTF SOP's own airspeeds section, which was checked first as instructed but only lists VNE/VNO/VA/VFE limit speeds, no cruise TAS figure for either type. Worth noting: Sling 2's VNO is 110kn per that SOP — genuinely a different figure from its 100kn cruise TAS, not interchangeable with it."},
   {v:"v0.90.0",d:"C172R and C172S are fully real now — all 7 tails. The last missing piece (usable fuel capacity) was actually already sitting in LTF's own SOP from round 94; hadn't been applied yet. C172R: 53 USG usable, converts to 200.63L at full precision. C172S: given directly in litres (200L) — a close cross-check against the R model's converted figure, which makes sense given how closely related the two airframes are. Applied uniformly across every tail of each model, since the source states it as a model-wide spec, not per-tail. Sling 2 also moved forward: real baggage limits now in (35kg front, 25kg rear — matches the station arms already in place exactly), and real per-tail BEW/arm for all 5 previously-known tails plus one new one, VH-FFZ, flagged since it doesn't appear in the earlier live fleet pull (same treatment as VH-FPV's similar discrepancy) — user confirmed this is partial data, more coming later, so fuel density is still null and every Sling 2 tail still correctly shows 'no data yet' despite the real progress. Full 28→29 tail fleet sweep clean, zero errors."},
