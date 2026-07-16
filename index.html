@@ -542,6 +542,7 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <button data-v="signout">Solo Signout</button>
       <button data-v="maintenance">Maintenance</button>
       <button data-v="ymmb" id="ymmbNavBtn">Management Briefing</button>
+      <button data-v="scheduling">Scheduling</button>
     </nav>
     <div class="userchip"><span class="dot"></span> Instructor · prototype</div>
   </header>
@@ -945,6 +946,24 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       </div>
 
       <div class="ymmb-foot">YMMB v1 · a small morning ritual · not an operational authority</div>
+    </section>
+
+    <section class="view" data-view="scheduling">
+      <h1 class="title" style="margin-bottom:var(--u3)">Scheduling <span style="color:var(--faint); font-weight:700; font-size:14px">[PREVIEW]</span></h1>
+      <div class="hint" style="max-width:640px">Matches student availability, instructor duty hours and rules, and live fleet status to suggest training bookings — checked against overlaps and constraints automatically. <b>Suggest-only</b>: nothing books itself. Every match shown here needs to be confirmed by a person before it becomes a real booking. Not connected to FlightLogger yet — that's a separate, later step, and needs its own schema-verification work first, same as everything else in this app that talks to FlightLogger.</div>
+
+      <div class="panel" style="margin-top:var(--u5)">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--u3)">
+          <div class="plabel" style="margin-bottom:0">Suggested Matches</div>
+          <div style="display:flex; gap:var(--u3)">
+            <button class="vbtn" id="schedPreviewBtn" style="margin-left:0; padding:6px 14px; font-size:12px">Preview with sample data</button>
+            <button class="vbtn" id="schedClearBtn" style="margin-left:0; padding:6px 14px; font-size:12px; display:none">Clear preview</button>
+          </div>
+        </div>
+        <div id="schedResults" style="margin-top:var(--u3)">
+          <div class="hint" style="padding:var(--u4) 0">No student, instructor, or availability data yet — nothing to match against. The matching logic itself is built and tested (see the Home page changelog), just waiting on real data to run against.</div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -1508,13 +1527,144 @@ function trk(a,b){const dLon=(b.lon-a.lon)*Math.PI/180,la1=a.lat*Math.PI/180,la2
 function inEnv(w,a,env){let ins=false;for(let i=0,j=env.length-1;i<env.length;j=i++){const xi=env[i].a,yi=env[i].w,xj=env[j].a,yj=env[j].w;const hit=((yi>w)!==(yj>w))&&(a<((xj-xi)*(w-yi))/(yj-yi)+xi);if(hit)ins=!ins;}return ins;}
 const $=s=>document.querySelector(s);
 
+// ---- Scheduling matching engine (round 99) ----------------------------
+// Pure, local logic — no FlightLogger calls anywhere in this file.
+// Suggest-only: this NEVER creates a booking, it only proposes matches for
+// a person to confirm. Live FlightLogger integration (reading real
+// student/instructor/aircraft data, and eventually writing confirmed
+// bookings back) is a separate, later step — needs its own schema-
+// verification round first (see backlog note, round 98), same discipline
+// as every other FlightLogger feature in this app.
+//
+// Data model (times as "HH:MM" 24hr strings, one day at a time — the
+// caller is responsible for only passing same-day data through):
+//
+//   student    = { id, name, aircraftTypeNeeded, availability: [{start,end}] }
+//   instructor = { id, name, dutyStart, dutyEnd, maxFlightsPerDay,
+//                   flightsBookedToday, existingBookings: [{start,end}],
+//                   rules: [{ label, check(student, slot) => bool }] }
+//   aircraft   = { reg, type, existingBookings: [{start,end}] }
+//
+// Rules check the WHOLE candidate window as one slot — they don't trim it
+// to a different start/end time. A window that violates a rule is
+// rejected outright, not silently shifted. This is deliberate: shows a
+// human the actual available window, rather than a tool-invented one they
+// didn't ask for. Confirmed with a real test (round 99) that this is what
+// actually happens, not assumed.
+
+function timeToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function minutesToTime(m){ const h=Math.floor(m/60), mm=m%60; return `${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; }
+
+// Overlapping window between two [start,end) ranges, or null if none.
+function timeOverlap(aStart,aEnd,bStart,bEnd){
+  const s=Math.max(timeToMinutes(aStart),timeToMinutes(bStart));
+  const e=Math.min(timeToMinutes(aEnd),timeToMinutes(bEnd));
+  if(s>=e) return null;
+  return {start:minutesToTime(s),end:minutesToTime(e)};
+}
+
+// Subtracts a list of booked windows from a single available window,
+// returning the remaining free sub-windows.
+function subtractBookings(windowStart,windowEnd,bookings){
+  let free=[{start:windowStart,end:windowEnd}];
+  bookings.forEach(b=>{
+    const next=[];
+    free.forEach(f=>{
+      const fs=timeToMinutes(f.start), fe=timeToMinutes(f.end);
+      const bs=timeToMinutes(b.start), be=timeToMinutes(b.end);
+      if(be<=fs || bs>=fe){ next.push(f); return; }
+      if(bs>fs) next.push({start:f.start,end:minutesToTime(bs)});
+      if(be<fe) next.push({start:minutesToTime(be),end:f.end});
+    });
+    free=next;
+  });
+  return free.filter(f=>timeToMinutes(f.end)>timeToMinutes(f.start));
+}
+
+// Core matching function. Returns suggested matches sorted longest-window-
+// first (a simple, transparent heuristic for a human to review — not a
+// claim of "optimal", matching the suggest-only framing).
+function generateSuggestedMatches(students, instructors, aircraft, minDurationMinutes){
+  minDurationMinutes = minDurationMinutes || 60;
+  const suggestions=[];
+  students.forEach(student=>{
+    const candidateAircraft=aircraft.filter(a=>a.type===student.aircraftTypeNeeded);
+    student.availability.forEach(studentWindow=>{
+      instructors.forEach(instructor=>{
+        if((instructor.flightsBookedToday||0)>=(instructor.maxFlightsPerDay||Infinity)) return;
+        const dutyOverlap=timeOverlap(studentWindow.start,studentWindow.end,instructor.dutyStart,instructor.dutyEnd);
+        if(!dutyOverlap) return;
+        const instructorFree=subtractBookings(dutyOverlap.start,dutyOverlap.end,instructor.existingBookings||[]);
+        instructorFree.forEach(freeWindow=>{
+          candidateAircraft.forEach(ac=>{
+            const acFree=subtractBookings(freeWindow.start,freeWindow.end,ac.existingBookings||[]);
+            acFree.forEach(slot=>{
+              const durationMin=timeToMinutes(slot.end)-timeToMinutes(slot.start);
+              if(durationMin<minDurationMinutes) return;
+              const failedRule=(instructor.rules||[]).find(r=>!r.check(student,slot));
+              if(failedRule) return;
+              suggestions.push({
+                studentId:student.id, studentName:student.name,
+                instructorId:instructor.id, instructorName:instructor.name,
+                aircraftReg:ac.reg, start:slot.start, end:slot.end,
+                minutesLong:durationMin,
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+  return suggestions.sort((a,b)=>b.minutesLong-a.minutesLong);
+}
+
+// Sample data for the "preview with sample data" button only — clearly
+// labelled [SAMPLE] throughout so it's never mistakable for real students,
+// matching the honesty pattern used everywhere else in this app. Exists to
+// demonstrate the engine actually works, not as a stand-in for real data.
+const SCHED_SAMPLE_STUDENTS=[
+  {id:"s1",name:"[SAMPLE] Student A",aircraftTypeNeeded:"DA40",availability:[{start:"08:00",end:"12:00"}]},
+  {id:"s2",name:"[SAMPLE] Student B",aircraftTypeNeeded:"C172R",availability:[{start:"09:00",end:"11:00"}]},
+];
+const SCHED_SAMPLE_INSTRUCTORS=[
+  {id:"i1",name:"[SAMPLE] Instructor A",dutyStart:"07:00",dutyEnd:"18:00",maxFlightsPerDay:3,flightsBookedToday:0,existingBookings:[{start:"10:00",end:"10:30"}],rules:[]},
+  {id:"i2",name:"[SAMPLE] Instructor B",dutyStart:"08:00",dutyEnd:"16:00",maxFlightsPerDay:2,flightsBookedToday:0,existingBookings:[],rules:[
+    {label:"No lessons starting before 09:00",check:(student,slot)=>slot.start>="09:00"},
+  ]},
+];
+const SCHED_SAMPLE_AIRCRAFT=[
+  {reg:"[SAMPLE]-AAA",type:"DA40",existingBookings:[]},
+  {reg:"[SAMPLE]-BBB",type:"C172R",existingBookings:[]},
+];
+function renderSchedResults(matches,isSample){
+  const el=$("#schedResults");
+  if(!matches.length){
+    el.innerHTML=`<div class="hint" style="padding:var(--u4) 0">No matches found for this data.</div>`;
+    return;
+  }
+  const banner=isSample?`<div class="hint" style="color:var(--amber); margin-bottom:var(--u3)">Preview using [SAMPLE] data — not real students or instructors. Clear this before using with anything real.</div>`:"";
+  el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Window</th><th class="num">Length</th></tr></thead><tbody>
+    ${matches.map(m=>`<tr><td>${m.studentName}</td><td>${m.instructorName}</td><td>${m.aircraftReg}</td><td>${m.start}–${m.end}</td><td class="num">${m.minutesLong} min</td></tr>`).join("")}
+  </tbody></table>`;
+}
+$("#schedPreviewBtn").addEventListener("click",()=>{
+  const matches=generateSuggestedMatches(SCHED_SAMPLE_STUDENTS,SCHED_SAMPLE_INSTRUCTORS,SCHED_SAMPLE_AIRCRAFT);
+  renderSchedResults(matches,true);
+  $("#schedClearBtn").style.display="";
+});
+$("#schedClearBtn").addEventListener("click",()=>{
+  $("#schedResults").innerHTML=`<div class="hint" style="padding:var(--u4) 0">No student, instructor, or availability data yet — nothing to match against. The matching logic itself is built and tested (see the Home page changelog), just waiting on real data to run against.</div>`;
+  $("#schedClearBtn").style.display="none";
+});
+
+
 const pad3=n=>String(Math.round(n)).padStart(3,"0");
 
 window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.91.0";
+const VERSION="v0.92.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -1524,7 +1674,7 @@ const VERSION="v0.91.0";
 // reaches the required count it unlocks for the rest of the session
 // (in-memory only, resets on reload — same as everything else in this
 // app, no persistent storage).
-const GATED_TABS=["maintenance","ymmb"];
+const GATED_TABS=["maintenance","ymmb","scheduling"];
 const GATE_CLICKS_REQUIRED=6;
 const tabClickCounts={};
 const tabUnlocked=new Set();
@@ -2154,6 +2304,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.92.0",d:"New Scheduling tab — groundwork for the student/instructor/aircraft auto-matching module (separate, broader than the existing Circuit Booking roadmap item). The actual matching engine is real and tested, not just scaffolding: time-overlap detection, booking subtraction (splits an available window around existing bookings), instructor daily-flight limits, per-instructor custom rules, and a minimum-lesson-duration filter — 11 unit tests, all passing, run in isolation with Node before any of it went into the app. One genuine design question the tests surfaced and answered: rules evaluate the whole candidate window as a single slot rather than trimming it to fit — a window that starts too early gets rejected outright, not silently shifted to a time the tool invented. Suggest-only, as agreed: nothing in this module writes to FlightLogger or creates a real booking — that's explicitly a separate, later step needing its own schema-verification round first. Added a 'Preview with sample data' button so the working engine is visible now, clearly labelled [SAMPLE] throughout and easy to clear — not a stand-in for real data, just proof the logic works before real student/instructor data arrives. Gated behind the same 6-click mechanism as every other non-Home/Solo-Signout tab."},
   {v:"v0.91.0",d:"Aircraft selection now stays in sync between W&B and Fuel Plan — pick a tail in either one, the other reflects it immediately, including its actual computed state (not just the dropdown), even before switching to that page. Guarded the same way the existing fuel-litres sync already was, so there's no risk of a feedback loop between the two. Nav Map: C172 routes now default each leg's TAS to N0110 (110kn), Sling 2 routes (once any exist — none do yet) will default to N0100 (100kn) — both stated directly, not found in the LTF SOP's own airspeeds section, which was checked first as instructed but only lists VNE/VNO/VA/VFE limit speeds, no cruise TAS figure for either type. Worth noting: Sling 2's VNO is 110kn per that SOP — genuinely a different figure from its 100kn cruise TAS, not interchangeable with it."},
   {v:"v0.90.0",d:"C172R and C172S are fully real now — all 7 tails. The last missing piece (usable fuel capacity) was actually already sitting in LTF's own SOP from round 94; hadn't been applied yet. C172R: 53 USG usable, converts to 200.63L at full precision. C172S: given directly in litres (200L) — a close cross-check against the R model's converted figure, which makes sense given how closely related the two airframes are. Applied uniformly across every tail of each model, since the source states it as a model-wide spec, not per-tail. Sling 2 also moved forward: real baggage limits now in (35kg front, 25kg rear — matches the station arms already in place exactly), and real per-tail BEW/arm for all 5 previously-known tails plus one new one, VH-FFZ, flagged since it doesn't appear in the earlier live fleet pull (same treatment as VH-FPV's similar discrepancy) — user confirmed this is partial data, more coming later, so fuel density is still null and every Sling 2 tail still correctly shows 'no data yet' despite the real progress. Full 28→29 tail fleet sweep clean, zero errors."},
   {v:"v0.89.0",d:"Business operations optimisations."},
