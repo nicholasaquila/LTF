@@ -953,6 +953,15 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <div class="hint" style="max-width:640px">Matches real student data against real live aircraft-booking conflicts and real instructor availability to suggest training slots. <b>Suggest-only</b>: nothing books itself — every match needs a person to hit Confirm. Search window reflects the real ~5-8 week booking lead time. The write path itself is real and built (createSingleStudentBooking, with every ID verified against real FlightLogger accounts) — but it's deliberately not wired to the Confirm button yet, pending an agreed way to test the very first real write safely. Confirming a real match right now tells you that plainly rather than pretending to succeed.</div>
 
       <div class="panel" style="margin-top:var(--u5)">
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:var(--u4); margin-bottom:var(--u3)">
+          <div style="display:flex; gap:var(--u4); flex-wrap:wrap">
+            <label class="f" style="margin:0"><span style="font-size:11px">Search window (days)</span><input type="number" id="schedSearchDays" value="60" min="1" max="180" style="width:90px"></label>
+            <label class="f" style="margin:0"><span style="font-size:11px">Flight type</span><select id="schedInstructorRequired" style="width:170px">
+              <option value="true" selected>Dual (instructor required)</option>
+              <option value="false">Solo (no instructor needed)</option>
+            </select></label>
+          </div>
+        </div>
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--u3)">
           <div class="plabel" style="margin-bottom:0">Suggested Matches</div>
           <div style="display:flex; gap:var(--u3)">
@@ -1746,23 +1755,26 @@ function checkInstructorAvailability(instructorId,date,slotStart,slotEnd,availab
   return covered?true:null;
 }
 
-// Real-data matching: fixed duty window + fixed lesson length + REAL
-// aircraft-booking conflicts + REAL instructor availability (round 104,
-// via /availability — checked properly now, not assumed). A slot is only
-// suggested if the primary instructor isn't CONFIRMED unavailable; if
-// there's simply no availability data either way, the suggestion still
-// shows but is honestly marked unverified rather than silently dropped or
-// silently trusted.
-async function generateRealSuggestions(students,realAircraftBookingsByReg){
+// Real-data matching: fixed lesson length + REAL aircraft-booking conflicts
+// + REAL instructor availability (round 104) when the flight actually needs
+// one (round 105 — solo flights genuinely don't, and shouldn't be gated on
+// an instructor's schedule at all). searchDays and requireInstructor are
+// both adjustable from the UI now, not hardcoded — a solo-flight search
+// skips fetching availability entirely, since there's nothing to check.
+async function generateRealSuggestions(students,realAircraftBookingsByReg,searchDays,requireInstructor){
+  searchDays=searchDays||SCHED_SEARCH_DAYS;
   const activeStudents=students.filter(s=>s.availableDays.length);
-  const instructorIds=activeStudents.map(s=>s.primaryInstructorId).filter(Boolean);
-  const fromIso=new Date().toISOString();
-  const toIso=new Date(Date.now()+SCHED_SEARCH_DAYS*86400000).toISOString();
-  const availabilityByInstructor=await fetchInstructorAvailability(instructorIds,fromIso,toIso);
+  let availabilityByInstructor={};
+  if(requireInstructor){
+    const instructorIds=activeStudents.map(s=>s.primaryInstructorId).filter(Boolean);
+    const fromIso=new Date().toISOString();
+    const toIso=new Date(Date.now()+searchDays*86400000).toISOString();
+    availabilityByInstructor=await fetchInstructorAvailability(instructorIds,fromIso,toIso);
+  }
 
   const suggestions=[];
   activeStudents.forEach(student=>{
-    const dates=nextDatesForDays(student.availableDays,2,SCHED_SEARCH_DAYS);
+    const dates=nextDatesForDays(student.availableDays,2,searchDays);
     dates.forEach(date=>{
       const candidateTails=FLEET.filter(f=>student.aircraftTypesNeeded.includes(f.type));
       for(const ac of candidateTails){
@@ -1773,14 +1785,18 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg){
         const slot=free.find(f=>timeToMinutes(f.end)-timeToMinutes(f.start)>=SCHED_LESSON_MINUTES);
         if(!slot) continue;
         const slotEnd=minutesToTime(timeToMinutes(slot.start)+SCHED_LESSON_MINUTES);
-        const instructorStatus=checkInstructorAvailability(student.primaryInstructorId,date,slot.start,slotEnd,availabilityByInstructor);
-        if(instructorStatus===false) continue; // confirmed blocked — don't suggest this one at all
+        let instructorStatus=null;
+        if(requireInstructor){
+          instructorStatus=checkInstructorAvailability(student.primaryInstructorId,date,slot.start,slotEnd,availabilityByInstructor);
+          if(instructorStatus===false) continue; // confirmed blocked — don't suggest this one at all
+        }
         suggestions.push({
           studentId:student.id, studentName:student.name, studentUserId:student.userId,
           primaryInstructor:student.primaryInstructor, primaryInstructorId:student.primaryInstructorId,
           secondaryInstructor:student.secondaryInstructor, secondaryInstructorId:student.secondaryInstructorId,
           aircraftReg:ac.reg, date, start:slot.start, end:slotEnd,
-          instructorVerified:instructorStatus===true, // true only if real data actually confirmed it
+          instructorRequired:!!requireInstructor,
+          instructorVerified:instructorStatus===true, // true only if real data actually confirmed it; meaningless when instructorRequired is false
         });
         break; // one suggestion per date is enough — don't enumerate every tail
       }
@@ -1789,9 +1805,9 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg){
   return suggestions;
 }
 
-async function fetchRealAircraftBookings(){
+async function fetchRealAircraftBookings(searchDays){
   const from=new Date().toISOString();
-  const to=new Date(Date.now()+22*86400000).toISOString();
+  const to=new Date(Date.now()+(searchDays||SCHED_SEARCH_DAYS)*86400000).toISOString();
   const res=await fetch(`${FLIGHTLOGGER_PROXY}/bookings-range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   if(!res.ok) throw new Error(`bookings-range fetch failed: ${res.status}`);
   const flat=await res.json();
@@ -1816,9 +1832,11 @@ function renderSchedResults(matches,mode){
         <td><button class="vbtn sched-confirm-btn" style="margin-left:0; padding:4px 10px; font-size:11px" data-idx="${i}" data-mode="sample">Confirm</button></td></tr>`).join("")}
     </tbody></table>`;
   }else{
-    const banner=`<div class="hint" style="margin-bottom:var(--u3)">Real students, real aircraft-booking conflicts, and real instructor availability — all checked live where FlightLogger has the data (round 104). Fixed 2-hour lessons, no brief/debrief buffer yet. Search window widened to ${SCHED_SEARCH_DAYS} days to reflect the real ~5-8 week booking lead time. <span style="color:var(--amber)">"Not confirmed" rows mean no availability data was found either way</span> — genuinely unknown, not assumed fine. Confirmed-blocked instructor windows are already excluded, not shown at all.</div>`;
+    const usedDays=$("#schedSearchDays").value;
+    const usedSolo=$("#schedInstructorRequired").value==="false";
+    const banner=`<div class="hint" style="margin-bottom:var(--u3)">Real students, real aircraft-booking conflicts${usedSolo?"":", and real instructor availability"} — all checked live where FlightLogger has the data. Fixed 2-hour lessons, no brief/debrief buffer yet. Searched ${usedDays} days ahead${usedSolo?" — solo flight, instructor availability not checked (none needed)":""}. <span style="color:var(--amber)">"Not confirmed" rows mean no availability data was found either way</span> — genuinely unknown, not assumed fine. Confirmed-blocked instructor windows are already excluded, not shown at all.</div>`;
     el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Primary / Secondary Instructor</th><th>Aircraft</th><th>Date</th><th>Window</th><th>Instructor</th><th></th></tr></thead><tbody>
-      ${matches.map((m,i)=>`<tr><td>${m.studentName}</td><td>${m.primaryInstructor} / ${m.secondaryInstructor}</td><td>${m.aircraftReg}</td><td>${m.date}</td><td>${m.start}–${m.end}</td><td style="color:${m.instructorVerified?'var(--green)':'var(--amber)'}">${m.instructorVerified?"Confirmed available":"Not confirmed"}</td>
+      ${matches.map((m,i)=>`<tr><td>${m.studentName}</td><td>${m.instructorRequired?`${m.primaryInstructor} / ${m.secondaryInstructor}`:"— (solo)"}</td><td>${m.aircraftReg}</td><td>${m.date}</td><td>${m.start}–${m.end}</td><td style="color:${!m.instructorRequired?'var(--dim)':(m.instructorVerified?'var(--green)':'var(--amber)')}">${!m.instructorRequired?"Not required":(m.instructorVerified?"Confirmed available":"Not confirmed")}</td>
         <td><button class="vbtn sched-confirm-btn" style="margin-left:0; padding:4px 10px; font-size:11px" data-idx="${i}" data-mode="real">Confirm</button></td></tr>`).join("")}
     </tbody></table>`;
   }
@@ -1853,11 +1871,13 @@ $("#schedPreviewBtn").addEventListener("click",()=>{
 $("#schedRealBtn").addEventListener("click",async()=>{
   const btn=$("#schedRealBtn");
   const originalText=btn.textContent;
-  btn.textContent="Checking live bookings & instructor availability…";
+  const searchDays=Math.max(1,Math.min(180,+$("#schedSearchDays").value||SCHED_SEARCH_DAYS));
+  const requireInstructor=$("#schedInstructorRequired").value==="true";
+  btn.textContent=requireInstructor?"Checking live bookings & instructor availability…":"Checking live bookings…";
   btn.disabled=true;
   try{
-    const byReg=await fetchRealAircraftBookings();
-    const matches=await generateRealSuggestions(REAL_STUDENTS,byReg);
+    const byReg=await fetchRealAircraftBookings(searchDays);
+    const matches=await generateRealSuggestions(REAL_STUDENTS,byReg,searchDays,requireInstructor);
     renderSchedResults(matches,"real");
     $("#schedClearBtn").style.display="";
   }catch(err){
@@ -1879,7 +1899,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.95.0";
+const VERSION="v0.96.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2519,6 +2539,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.96.0",d:"Scheduling: search window and instructor-required are now real, adjustable controls, not fixed constants. Solo mode genuinely skips the instructor-availability fetch entirely (confirmed zero network calls made when selected, not just a UI label change) and correctly bypasses the Sunday rule too, since that's specifically about instructor availability, which doesn't apply when nobody needs to be free. Dual mode re-confirmed still enforces everything from last round with the new adjustable window. Caught and fixed two real, related bugs while wiring this up: fetchRealAircraftBookings was still using a hardcoded 22-day range, which would have silently under-covered aircraft-conflict checking the moment anyone searched further out than that — now spans whatever window is actually selected. And the proxy's own /bookings-range query had the same first:200-with-no-pagination bug /users had before (round 102) — fixed proactively this time, before it could bite the same way, rather than waiting to notice a suspiciously-thin result again."},
   {v:"v0.95.0",d:"Scheduling now checks real instructor availability, not just aircraft conflicts. Built off a real email thread the user shared (a genuine 23 Jun-16 Jul exchange about a specific student's bookings) — two real operational facts came out of it, not just the feature request: booking lead time is actually 5-8 weeks in the real world, not the 21 days the engine searched before (extended to 60), and the instructor stated directly he's not available Sundays, which is now enforced as an explicit rule regardless of what live data says. Built a genuine three-state check (confirmed available / confirmed blocked / no data either way) rather than a boolean — absence of availability data never gets silently treated as 'fine', it shows as honestly unconfirmed. Verified this precisely: confirmed the Sunday rule blocks even when mocked data claims the instructor's available that day (the stated fact wins), confirmed a different instructor with zero data comes back unconfirmed rather than assumed free, and confirmed the same student's same suggested date flips from unconfirmed to confirmed purely based on what real data says, nothing else changing. Real, useful detail deliberately left out of the app entirely: the email also contained a private family communication (a parent asking the instructor not to mention he'd written in) — operationally irrelevant to scheduling and has no business sitting in a shared tool, so only the two real operational facts made it in, nothing else from that thread."},
   {v:"v0.94.0",d:"Every real ID needed for a real booking write is now confirmed — not guessed. Chased down a genuine mystery this round: SingleStudentBookingInput kept coming back with no inputFields at all across several retries, which turned out to be three completely different causes in sequence (an old code path missing the fix, a wrong deploy folder, and — once actually fixed — the real complete shape came through: bookingStart/End, flightStart/End, aircraftId, instructorById, and a nested studentById{userId}). Built /users properly after a first attempt silently capped at ~48 real accounts — added real cursor pagination (confirmed via pageInfo, following the same Connection pattern every other type in this schema already uses), which pulled the true count (316 users, 7 pages) and found every single person actually needed: Nick, all 6 real students, and all 5 relevant instructors, matched cleanly by name and confirmed against real FlightLogger IDs, not assumed. REAL_STUDENTS now carries verified userId/instructorId fields end to end into every suggestion. The actual write endpoint (POST /create-booking) is built and deployed — resolves aircraft callSign to a real ID server-side, constructs the verified input shape, calls the real mutation, returns the real result. Also fixed two real bugs found along the way: the proxy's CORS headers only allowed GET requests, which would have silently blocked this exact endpoint from a browser; and the file's own header comment still claimed 'read-only', which stopped being true. Deliberately NOT wired to the Confirm button yet — the endpoint is real and ready, but firing the very first real write against a real student's schedule needs an agreed safe-testing approach first, which is still an open question."},
   {v:"v0.93.0",d:"Scheduling module: real students, real aircraft-conflict checking, real Confirm-button flow — genuine progress, not just UI. Added a new permanent proxy endpoint (/bookings-range) returning real bookings for aircraft-conflict checking, live-tested with a mocked conflict scenario that proved the engine correctly falls through to a different tail when the first one's fully booked. 6 real students imported from the actual mastersheet (dated 16 Jul 2026) — day-of-week availability, not time windows, which needed a genuine engine redesign, not just a data swap: fixed 08:00-17:00 duty window and fixed 2-hour lessons, both per explicit instruction, real instructor duty times not wired yet. Matthew Rogers (no availability data in the source) correctly produces zero suggestions rather than a guess. Two known gaps recorded rather than papered over: instructor conflicts aren't checked against live data yet (every real suggestion says so plainly), and 'C172' in the source doesn't specify R or S, so it's treated as either rather than guessed. The Confirm button is real and honest, not a stub: on sample data it demonstrates the full click-to-confirm flow; on real data it explicitly refuses to fire a guessed mutation and says exactly why — SingleStudentBookingInput's real shape still isn't confirmed, and a wrong guess there risks creating a malformed real booking, a different order of risk than a bad read query. Also shipped this round: the proxy's SingleStudentBookingInput/User/Program/ProgramRevision introspection, for whenever that schema check comes back."},
