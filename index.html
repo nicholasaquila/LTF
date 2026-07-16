@@ -1514,7 +1514,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.90.0";
+const VERSION="v0.91.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2154,6 +2154,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.91.0",d:"Aircraft selection now stays in sync between W&B and Fuel Plan — pick a tail in either one, the other reflects it immediately, including its actual computed state (not just the dropdown), even before switching to that page. Guarded the same way the existing fuel-litres sync already was, so there's no risk of a feedback loop between the two. Nav Map: C172 routes now default each leg's TAS to N0110 (110kn), Sling 2 routes (once any exist — none do yet) will default to N0100 (100kn) — both stated directly, not found in the LTF SOP's own airspeeds section, which was checked first as instructed but only lists VNE/VNO/VA/VFE limit speeds, no cruise TAS figure for either type. Worth noting: Sling 2's VNO is 110kn per that SOP — genuinely a different figure from its 100kn cruise TAS, not interchangeable with it."},
   {v:"v0.90.0",d:"C172R and C172S are fully real now — all 7 tails. The last missing piece (usable fuel capacity) was actually already sitting in LTF's own SOP from round 94; hadn't been applied yet. C172R: 53 USG usable, converts to 200.63L at full precision. C172S: given directly in litres (200L) — a close cross-check against the R model's converted figure, which makes sense given how closely related the two airframes are. Applied uniformly across every tail of each model, since the source states it as a model-wide spec, not per-tail. Sling 2 also moved forward: real baggage limits now in (35kg front, 25kg rear — matches the station arms already in place exactly), and real per-tail BEW/arm for all 5 previously-known tails plus one new one, VH-FFZ, flagged since it doesn't appear in the earlier live fleet pull (same treatment as VH-FPV's similar discrepancy) — user confirmed this is partial data, more coming later, so fuel density is still null and every Sling 2 tail still correctly shows 'no data yet' despite the real progress. Full 28→29 tail fleet sweep clean, zero errors."},
   {v:"v0.89.0",d:"Business operations optimisations."},
   {v:"v0.88.0",d:"LTF's own Aircraft SOP (v4.0, Jan 2022, the CASA-facing copy) added two new types with real weight/baggage limits — PA44 Seminole (MTOW 1727kg) and DA42 (MTOW 1785kg, three named baggage compartments: Nose 30kg, Baggage 45kg, Out 18kg). Both still correctly show 'no data yet' — this SOP documents weight limits, not the CG-arm placement data W&B needs, so neither type has station arms yet. One figure deliberately NOT used: the SOP's own PA44 fuel numbers are internally contradictory (418L usable stated as MORE than 408L total, which isn't physically possible) — left fuel capacity null rather than guess which number was the typo. Good cross-check confirmation on the DA40: this SOP's MTOW (1200kg), baggage limit (30kg), and both power-setting burn rates (55%: 8.5, 75%: 11 USG/hr) all matched the app's existing figures exactly, and its fuel tank sizes converted to within 1L of what's already in use — strong signal this source is reliable. Smaller discrepancies flagged, not silently resolved: this SOP's C172R/C172S MTOW figures (1114kg/1159kg) differ slightly from the POH-derived figures already in use (1111.30kg/1156.66kg) — kept the POH's numbers, since it's the actual certificated limitations document and this SOP reads as a rounded operational summary. Also noted for the record: this SOP separately documents 172SP and 172RG as distinct variants from 172S/172R — not built as new types, since no real fleet tail currently matches either, but flagged so a future round doesn't get confused between them if one shows up."},
@@ -2277,7 +2278,10 @@ function buildWbFields(acType){
 }
 
 ["#ac","#category","#fuel"].forEach(s=>$(s).addEventListener("input",()=>{
-  if(s==="#ac"){ buildWbFields(AIRCRAFT_TYPES[FLEET.find(f=>f.reg===acSel.value).type]); }
+  if(s==="#ac"){
+    buildWbFields(AIRCRAFT_TYPES[FLEET.find(f=>f.reg===acSel.value).type]);
+    syncAircraftSelection(acSel.value,"#ac");
+  }
   calcWB();
 }));
 // Delegated listener: catches input events from any dynamically-generated
@@ -2611,6 +2615,29 @@ function buildPowerSettings(acType){
     `<option value="${ps.pct}" ${ps.default?"selected":""}>${ps.label} (${ps.burnUSGH} USG/hr)</option>`
   ).join("");
 }
+// Aircraft selection stays in sync across every Solo Signout section that
+// has its own aircraft dropdown (W&B, Fuel Plan) — pick a tail in one, the
+// other reflects it immediately, not just whenever it's next visited.
+// Guarded the same way the existing W&B-fuel <-> Fuel-Plan-endurance sync
+// already is: set the OTHER select's value directly rather than dispatching
+// a new change/input event, so this can't create a feedback loop between
+// the two listeners. exceptSelId is whichever select the user actually
+// interacted with — skipped, since it's already correct and its own
+// listener is already handling its own rebuild.
+function syncAircraftSelection(reg,exceptSelId){
+  if(exceptSelId!=="#ac" && acSel.value!==reg){
+    acSel.value=reg;
+    buildWbFields(AIRCRAFT_TYPES[FLEET.find(f=>f.reg===reg).type]);
+    calcWB();
+  }
+  if(exceptSelId!=="#fpAc" && fpAcSel.value!==reg){
+    fpAcSel.value=reg;
+    const ac=FLEET.find(f=>f.reg===reg);
+    buildPowerSettings(AIRCRAFT_TYPES[ac.type]);
+    $("#fp-endurance-l").value=ac.maxFuelL??"";
+    calcFuelPlan();
+  }
+}
 fpAcSel.addEventListener("change",()=>{
   // Reset Endurance-litres to this aircraft's usable fuel by default (actual fuel on board
   // at start-up per the handbook's step 6 — instructor can reduce if not filled to tabs).
@@ -2618,6 +2645,7 @@ fpAcSel.addEventListener("change",()=>{
   buildPowerSettings(AIRCRAFT_TYPES[ac.type]);
   $("#fp-endurance-l").value=ac.maxFuelL??"";
   calcFuelPlan();
+  syncAircraftSelection(fpAcSel.value,"#fpAc");
 });
 $("#fpPowerSetting").addEventListener("change",()=>{
   // Refresh every row's auto-derived side using the new rate. If the user has
@@ -2814,7 +2842,18 @@ function drawMap(){
     const hasLeg=i>0;
     const trkCell=hasLeg?pad3((trk(pts[i-1],p)-MAGVAR+360)%360):"";
     const distCell=hasLeg?nm(pts[i-1],p).toFixed(1):"";
-    const tasDefault=(hasLeg&&curRoute.ac==="DA40")?"N0120":"";
+    // Default TAS per route's aircraft type, filed-flight-plan notation
+    // (N0120 = 120kn). DA40's is from its own SOP figure (round 35). C172
+    // (110kn) and Sling 2/SLG2 (100kn) are stated directly by the user
+    // (round 97) — checked the LTF SOP first as instructed, but its
+    // airspeeds sections only list VNE/VNO/VA/VFE limit speeds, no cruise
+    // TAS figure for either type, so these aren't from that document.
+    // Worth noting: Sling 2's VNO is 110kn (per the SOP) — genuinely a
+    // different figure from its 100kn cruise TAS, not a stand-in for it.
+    // No Sling 2 routes exist in ROUTES yet, but this is ready the moment
+    // one is added — no further code change needed.
+    const ROUTE_DEFAULT_TAS={DA40:"N0120",C172:"N0110",SLG2:"N0100"};
+    const tasDefault=(hasLeg&&ROUTE_DEFAULT_TAS[curRoute.ac])?ROUTE_DEFAULT_TAS[curRoute.ac]:"";
     const isFullStop=fsState.has(i);
     const isFinal=i===pts.length-1;
     // Main waypoint row (arrival at this point, or turning point)
