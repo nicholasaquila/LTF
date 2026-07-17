@@ -288,6 +288,16 @@
   .mr-table th{background:var(--mr-paper2); color:var(--mr-red); font-weight:800; text-transform:none; letter-spacing:0}
   .mr-table td{height:30px}
   .mr-table tr:nth-child(even) td{background:rgba(165,18,26,.03)}
+  .mr-trial-form{display:grid; grid-template-columns:1fr 1fr; gap:var(--u3); margin-top:var(--u3)}
+  .mr-trial-form .f{grid-column:span 1}
+  .mr-trial-form .f.wide{grid-column:1 / -1}
+  .mr-trial-form label{font-size:9.5px; color:var(--mr-red); text-transform:uppercase; letter-spacing:.05em; font-weight:700; display:block; margin-bottom:2px}
+  .mr-trial-form textarea, .mr-trial-form input{background:var(--mr-paper2); border:1px solid var(--mr-red-dim); border-radius:2px; color:var(--mr-ink); padding:var(--u2); font-size:12.5px; font-family:var(--font-ui); width:100%; box-sizing:border-box}
+  .mr-trial-form textarea{resize:vertical; min-height:50px}
+  .mr-trial-form input:focus, .mr-trial-form textarea:focus{outline:none; border-color:var(--mr-red); box-shadow:0 0 0 2px rgba(165,18,26,.15)}
+  .mr-trial-submit{grid-column:1 / -1; background:var(--mr-red); color:#fff; border:none; border-radius:2px; padding:var(--u2) var(--u4); font-weight:700; font-size:12px; cursor:pointer; justify-self:start}
+  .mr-trial-submit:hover{background:var(--mr-red-dim)}
+  .mr-trial-submit:disabled{opacity:.5; cursor:not-allowed}
   .maplegend{position:absolute; top:56px; right:var(--u6); font-size:10.5px; color:var(--dim);
     background:rgba(18,22,31,.92); padding:var(--u2) var(--u3); border-radius:var(--r1); line-height:1.8; border:1px solid var(--line)}
   .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle} /* point-scale exception */
@@ -765,32 +775,32 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
 
       <div class="subview" data-msub="maint">
         <div class="plabel" style="margin-top:var(--u4)">Maintenance Release</div>
-        <div class="hint">CASA Civil Aviation Regulation 43 format, matching the paper Maintenance Release exactly — structure only, not yet populated with data. Informed by CAAP 43-01 v2.3.</div>
+        <div class="hint">CASA Civil Aviation Regulation 43 format, matching the paper Maintenance Release exactly — kept here as a structural reference for the real, per-aircraft data below, not populated with any example values itself. Informed by CAAP 43-01 v2.3. Part 2 (Technical Log) has a real, working version further down for each aircraft — see below.</div>
         <div class="hint" style="margin-top:var(--u2)">A maintenance release stops being in force the moment any of these happens: an endorsement records the aircraft as not airworthy, the expiry date or hours are reached, a new release's inspection has begun, a Part 1 requirement wasn't completed by its due time, or a required airworthiness directive hasn't been actioned.</div>
 
         <div class="mr-block">
           <div class="mr-part-label">Part 1 — Maintenance Requirements <span id="mrPart1LiveTag" style="font-weight:600; font-size:11px; text-transform:none; letter-spacing:0"></span></div>
           <div class="hint" style="margin-bottom:var(--u3)">Lists maintenance that will fall due during this release's validity period, and when. This section doesn't certify completion itself — once something's done, it's transferred to Part 2 or the aircraft log book and certified there, then this row is marked complied-with.</div>
           <div class="mr-header-grid">
-            <div class="f"><label>Maintenance Release No.</label><input type="text" value="A347568"></div>
-            <div class="f"><label>Aircraft Type</label><input type="text" value="DA40"></div>
-            <div class="f"><label>Registration</label><input type="text" value="VH-XPP"></div>
-            <div class="f"><label>Expires (date)</label><input type="text" value="26/06/27"></div>
-            <div class="f"><label>Expires (hours)</label><input type="text" value="2075.2"></div>
-            <div class="f"><label>Issued by</label><input type="text" value="AIRFLITE PTY LTD App. No. CASA.COA.0072"></div>
-            <div class="f"><label>Signed</label><input type="text" placeholder="(illegible in source)"></div>
-            <div class="f"><label>Aircraft TTIS at issue</label><input type="text" value="1975.2"></div>
-            <div class="f"><label>Time</label><input type="text" value="11:00"></div>
-            <div class="f"><label>Date</label><input type="text" value="26/06/26"></div>
-            <div class="f"><label>Place</label><input type="text" value="YMMB"></div>
-            <div class="f"><label>AME licence/authority no.</label><input type="text" value="606346"></div>
-            <div class="f"><label>Operational Category</label><input type="text" value="PRIVATE / PART 142 OPERATION"></div>
-            <div class="f"><label>Schedules/System of Maintenance</label><input type="text" value="DA40-180 MAINTENANCE MANUAL AND CASA SCHEDULE 5 RADIO"></div>
+            <div class="f"><label>Maintenance Release No.</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Aircraft Type</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Registration</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Expires (date)</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Expires (hours)</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Issued by</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Signed</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Aircraft TTIS at issue</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Time</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Date</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Place</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>AME licence/authority no.</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Operational Category</label><input type="text" placeholder="—"></div>
+            <div class="f"><label>Schedules/System of Maintenance</label><input type="text" placeholder="—"></div>
           </div>
           <div class="mr-checkrow" style="display:flex; gap:var(--u5); margin:-var(--u2) 0 var(--u4); flex-wrap:wrap">
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" checked style="width:auto"> IFR</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" checked style="width:auto"> VFR Night</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" checked style="width:auto"> VFR Day</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto"> IFR</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto"> VFR Night</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto"> VFR Day</label>
           </div>
           <div style="overflow-x:auto">
             <table class="mr-table">
@@ -804,47 +814,6 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
                 </tr>
               </thead>
               <tbody id="mrPart1Body">
-                <tr><td>1</td><td>DA40-180 Maintenance Check Flight</td><td>First Flight</td><td></td><td></td></tr>
-                <tr><td>2</td><td>Lycoming 50 Hour Engine Inspection</td><td>2025.2 &plusmn; 5 Hrs or 26 Oct 26</td><td></td><td></td></tr>
-                <tr><td>3</td><td>DA40-180 50 Airframe Inspection</td><td>2025.2 &plusmn; 5 Hrs</td><td></td><td></td></tr>
-                <tr><td>4</td><td>Powerflow Exhaust 50 Hour Inspection</td><td>2025.2 &plusmn; 5 Hrs</td><td></td><td></td></tr>
-                <tr><td>5</td><td>Lycoming MSB 650 Intake Pipe &amp; Flange Inspection</td><td>2025.2 &plusmn; 5 Hrs</td><td></td><td></td></tr>
-                <tr><td>6</td><td>AD/GENERAL/87 AMDT 1</td><td>03 Feb 27</td><td></td><td></td></tr>
-                <tr><td>7</td><td>AWB 26-008 Fire Extinguisher 12 Month Inspection</td><td>03 Feb 27</td><td></td><td></td></tr>
-                <tr><td>8</td><td>Powerflow Exhaust Annual/500 Hour Inspection</td><td>03 Feb 27</td><td></td><td></td></tr>
-                <tr><td>9</td><td>Autopilot Mechanical Check</td><td>03 Feb 27 &plusmn; 30 Days</td><td></td><td></td></tr>
-                <tr><td>10</td><td>Magnetic Compass Calibration</td><td>03 Feb 27 &plusmn; 30 Days</td><td></td><td></td></tr>
-                <tr><td>11</td><td>Main Battery Capacity Check</td><td>03 Feb 27 &plusmn; 1 Month</td><td></td><td></td></tr>
-                <tr><td>12</td><td>CAO 100.5 App 1 Cl 10 Emergency Exits</td><td>27 Mar 27 &plusmn; 30 Days</td><td></td><td></td></tr>
-                <tr><td>13</td><td>DA40-180 200 Hour Inspection</td><td>08 May 27 &plusmn; 30 Days</td><td></td><td></td></tr>
-                <tr><td>14</td><td>DA40-180 Time Limit &ndash; Replace Brake Fluid</td><td>21 May 27 &plusmn; 60 Days</td><td></td><td></td></tr>
-                <tr><td>15</td><td>DA40-180 Daily Inspection</td><td>Daily</td><td></td><td></td></tr>
-                <tr><td>16</td><td>Portable ELT to be carried</td><td>Daily</td><td></td><td></td></tr>
-                <tr><td>17</td><td>Oil uplifts to be recorded in Part 3 of this MR</td><td>Daily</td><td></td><td></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="mr-block">
-          <div class="mr-part-label">Part 2 — Endorsements</div>
-          <div class="hint" style="margin-bottom:var(--u3)">Every defect found gets endorsed here, major or minor — the regulation doesn't distinguish, both must be recorded. A major defect (one that has caused or could cause a structural, control-system, engine, or fire failure) grounds the aircraft until it's rectified. A minor one may still allow flight if a pilot or LAME assesses it as not major and not required for the intended flight, with that assessment noted in the clearing column.</div>
-          <div style="overflow-x:auto">
-            <table class="mr-table">
-              <thead>
-                <tr>
-                  <th>Item No.</th>
-                  <th>Endorsements</th>
-                  <th>Date, signature and licence no.</th>
-                  <th>Item No.</th>
-                  <th>Clearing Endorsements</th>
-                  <th>Clearing signature, licence/authority no. and date</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>1</td><td>Pilot side rudder pedals, RHS brake fluid leak</td><td></td><td>1</td><td>New pilot RH M/cylinder seals fitted, ref Airflite Maint 20-</td><td></td></tr>
-                <tr><td>2</td><td>RHS Position light U/S</td><td></td><td>&nbsp;</td><td></td><td></td></tr>
-                <tr><td>&nbsp;</td><td></td><td></td><td>&nbsp;</td><td></td><td></td></tr>
               </tbody>
             </table>
           </div>
@@ -2134,7 +2103,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.108.0";
+const VERSION="v0.110.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2456,6 +2425,88 @@ function renderLiveWarningBand(elId, warning){
 // the nominal due-point has been passed, which is not automatically the
 // same as grounded (e.g. an item can be past its nominal point but still
 // inside its stated ± tolerance).
+// Round 122 — trial Maintenance Release Part 2 (Technical Log) entries,
+// real and persistent via the proxy's new /mr/:reg endpoints (backed by a
+// dedicated KV namespace, MR_DATA — separate from the scheduling cache,
+// since these entries need to survive indefinitely, not expire). Genuinely
+// per-aircraft: works for any registration in the real fleet, not just
+// VH-KAI's existing static example. Deliberately scoped to just this —
+// Part 1's other fields (MR number, expiry, issued-by, etc.) and Part 3
+// (daily inspection/TIS log) are untouched, per explicit instruction that
+// Part 3 is a separate, later piece of work. Aircraft type and
+// registration shown here are the real, synced fleet data, not
+// re-entered — "hours in service" isn't confirmed available from the
+// current FlightLogger query (only totalLandings is), so it stays out of
+// this section entirely rather than fake a sync that doesn't exist.
+async function renderMrPart2Trial(container,reg,type){
+  container.innerHTML=`<div class="mr-block">
+    <div class="mr-part-label">Part 2 — Technical Log (Trial)</div>
+    <div class="hint" style="margin-bottom:var(--u3)">Real, persistent trial entries for ${reg} (${type}) — stored independently of this app's own version, survives every future update. Not yet an operational record; for trialling the data entry itself. Part 1 (MR number, expiry, issued-by, etc.) and Part 3 (daily inspection/time-in-service log) are separate, later pieces of work — this covers defect, rectification, and sign-off only.</div>
+    <div id="mrTrialTableWrap-${reg}"><div class="hint">Loading existing entries…</div></div>
+    <div class="mr-trial-form" id="mrTrialForm-${reg}">
+      <div class="f wide"><label>Defect</label><textarea data-field="defect" placeholder="What was found"></textarea></div>
+      <div class="f wide"><label>Rectification</label><textarea data-field="rectification" placeholder="What was done to fix it"></textarea></div>
+      <div class="f"><label>Signed off by</label><input type="text" data-field="signedOffBy" placeholder="Name / licence"></div>
+      <div class="f"><label>Date</label><input type="date" data-field="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <button class="mr-trial-submit" data-reg="${reg}">Add entry</button>
+    </div>
+  </div>`;
+  await loadMrPart2Trial(reg);
+}
+async function loadMrPart2Trial(reg){
+  const wrap=$(`#mrTrialTableWrap-${reg}`);
+  if(!wrap) return;
+  try{
+    const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const entries=await res.json();
+    if(!entries.length){
+      wrap.innerHTML=`<div class="hint">No trial entries yet for ${reg}.</div>`;
+      return;
+    }
+    wrap.innerHTML=`<div style="overflow-x:auto"><table class="mr-table"><thead><tr>
+      <th>Date</th><th>Defect</th><th>Rectification</th><th>Signed off by</th>
+    </tr></thead><tbody>
+      ${entries.slice().reverse().map(e=>`<tr><td>${e.date}</td><td>${e.defect}</td><td>${e.rectification}</td><td>${e.signedOffBy}</td></tr>`).join("")}
+    </tbody></table></div>`;
+  }catch(err){
+    wrap.innerHTML=`<div class="hint" style="color:var(--mr-red)">Couldn't load existing entries (${err.message}) — the KV store may not be bound yet on the proxy side.</div>`;
+  }
+}
+document.body.addEventListener("click",async e=>{
+  const btn=e.target.closest(".mr-trial-submit"); if(!btn) return;
+  const reg=btn.dataset.reg;
+  const form=$(`#mrTrialForm-${reg}`);
+  const defect=form.querySelector('[data-field="defect"]').value.trim();
+  const rectification=form.querySelector('[data-field="rectification"]').value.trim();
+  const signedOffBy=form.querySelector('[data-field="signedOffBy"]').value.trim();
+  const date=form.querySelector('[data-field="date"]').value;
+  if(!defect||!rectification||!signedOffBy){
+    alert("Defect, rectification, and signed off by are all required.");
+    return;
+  }
+  btn.disabled=true; btn.textContent="Adding…";
+  try{
+    const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({defect,rectification,signedOffBy,date}),
+    });
+    if(!res.ok){
+      const body=await res.json().catch(()=>({}));
+      throw new Error(body.error||`HTTP ${res.status}`);
+    }
+    form.querySelector('[data-field="defect"]').value="";
+    form.querySelector('[data-field="rectification"]').value="";
+    form.querySelector('[data-field="signedOffBy"]').value="";
+    await loadMrPart2Trial(reg);
+  }catch(err){
+    alert(`Couldn't save this entry: ${err.message}`);
+  }finally{
+    btn.disabled=false; btn.textContent="Add entry";
+  }
+});
+
 function renderMrPart1FromLive(parts){
   const tag=$("#mrPart1LiveTag");
   if(!parts||!parts.length){
@@ -2492,7 +2543,7 @@ function renderMrPart1FromLive(parts){
 
 async function showLiveOnlyDetail(reg){
   const panel=$("#maintDetail");
-  panel.querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div>`;
+  panel.querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintMrTrialWrap-${reg}"></div>`;
   $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="margin:0">Loading live FlightLogger data…</div>`;
   $("#maintSubtabs").style.display="none"; // no discrepancies/documents/booking data for these yet
   try{
@@ -2511,6 +2562,7 @@ async function showLiveOnlyDetail(reg){
       <div class="hint" style="margin-top:var(--u2)">Total landings ${detail.totalLandings??'—'} · Total fuel ${detail.totalFuel??'—'} <span style="color:var(--sky)">[LIVE]</span></div>`;
     renderLiveWarningBand("#maintGaugePanel", detail.worstMaintenanceWarning);
     $("#maintGaugePanel").innerHTML+=`<div class="hint" style="margin-top:var(--u3)">This aircraft's detailed maintenance-parts records aren't available yet — the connected FlightLogger account can see warnings but not full parts history for aircraft outside VH-KAI. See VH-KAI for the full parts table (static snapshot).</div>`;
+    renderMrPart2Trial($(`#maintMrTrialWrap-${reg}`),detail.callSign,detail.model);
   }catch(err){
     console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
     $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="color:var(--amber)">Live detail fetch failed — try again shortly.</div>`;
@@ -2528,7 +2580,7 @@ $("#maintTiles").addEventListener("click",e=>{
     // VH-KAI: restore the full rich static panel (header/gauge/parts tables/
     // subtabs) exactly as before, then layer live warning data on top in its
     // own clearly-marked band underneath the gauge.
-    $("#maintDetail").querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintLiveBand" style="margin-top:var(--u3)"></div>`;
+    $("#maintDetail").querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintLiveBand" style="margin-top:var(--u3)"></div><div id="maintMrTrialWrap-${reg}" style="margin-top:var(--u3)"></div>`;
     $("#maintSubtabs").style.display="";
     renderMaintAcHeader();
     renderMaintGauge();
@@ -2544,6 +2596,7 @@ $("#maintTiles").addEventListener("click",e=>{
         }
         renderLiveWarningBand("#maintLiveBand", detail.worstMaintenanceWarning);
         renderMrPart1FromLive(detail.maintenanceParts);
+        renderMrPart2Trial($(`#maintMrTrialWrap-${reg}`),detail.callSign,detail.model);
       }catch(err){
         console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
         $("#maintLiveBand").innerHTML=`<div class="hint" style="color:var(--amber)">Live warning fetch failed — showing static data only above.</div>`;
@@ -2913,6 +2966,8 @@ async function runLiveIntegrityCheck(c,i){
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
 const CHANGELOG=[
+  {v:"v0.110.0",d:"Removed the static VH-XPP Maintenance Release example entirely — the specific example values in Part 1's header fields (MR number, expiry, issued-by, etc.) and the whole static Part 2 'Endorsements' table (now redundant with the real, per-aircraft trial system from last round) are gone. The layout, paper-form styling, and table structure stay exactly as they were — kept deliberately as the visual/structural reference for how this data should look, per instruction — just with no misleading example values sitting in it regardless of which aircraft is actually selected. Part 1's maintenance-requirements table is now genuinely empty until real live data populates it (still works correctly for VH-KAI, confirmed after the change). Part 3 (daily inspection/time-in-service log) is untouched — it was already an empty structural template with no specific example values, so nothing about it was actually 'the XPP sheet' in the first place."},
+  {v:"v0.109.0",d:"Real, persistent trial Maintenance Release Part 2 (Technical Log) data entry — defect, rectification, and signed-off-by, per aircraft, for every aircraft in the fleet, not just VH-KAI's existing static example. Storage genuinely lives independently of this app's own version: two new proxy endpoints (GET/POST /mr/:reg) backed by a dedicated Cloudflare KV namespace (MR_DATA, separate from the scheduling cache, since these entries need to persist indefinitely rather than expire) — the data survives every future rebuild of the HTML file itself, and multiple people can add entries for the same aircraft without overwriting each other's work. Aircraft type and registration shown are the real, synced fleet data, not re-entered; 'hours in service' stays out of this entirely, since it isn't confirmed available from the current FlightLogger query (only totalLandings is) — not faking a sync that doesn't exist. Deliberately scoped to Part 2 only, per explicit instruction: Part 1's other fields (MR number, expiry, issued-by, etc.) and Part 3 (daily inspection/time-in-service log) are separate, later work, untouched here. Worth noting directly: the existing static Part 1/2/3 example (VH-XPP) was already shown regardless of which aircraft tile is selected before this round, and still is — that's pre-existing behavior, out of scope for this change, not something introduced or fixed here."},
   {v:"v0.108.0",d:"Live Data Integrity checkers restructured: each now shows three separate, clearly labeled lines — Information (what the data actually is), Source (where it comes from and how the check works), and Application (what it would actually be used for in the app) — instead of one blended sentence mixing all three together. Colour now carries a real, three-way meaning rather than plain pass/fail: red means no genuine connection at all; amber means the connection/method is confirmed real but nothing in the app uses it yet; green means both the connection and a real application exist. ERSA, Airspace Boundaries, and CASA Part 61 MOS land on green/green/amber specifically — their real external sources are genuinely confirmed reachable, but nothing consumes that data yet, which is a materially better state than a flat failure and now reads as one. FlightLogger is the one entry that's fully green across all three. Each checker's three lines reveal in sequence (Information, then Source, then Application, ~280ms apart) once its real state is known, rather than all three appearing at once. Fixed a real timing bug before shipping: an early version revealed static (non-live-checked) entries instantly at script start, well before the splash sequence even finishes — same class of problem as the round-120 plane fix. Every entry's reveal now waits for its own natural staggered position in the splash sequence, and live-checked entries additionally wait for their real network check, whichever takes longer. Verified directly: nothing is coloured during the splash window, the cascade genuinely staggers one line at a time rather than jumping straight to the final state, a failed reachability check correctly swaps the Source line's text to the honest failure message, and the final state survives navigating away from and back to Home without re-triggering."},
   {v:"v0.107.0",d:"Fixed the splash screen plane sometimes taking a moment to appear. The plane's fly-in animation was an unconditional CSS rule on #plane itself, meaning its .15s delay started counting from whenever the browser happened to first paint that specific rule — not a fixed point in time, and for a large single-file app that parse-to-first-paint time isn't perfectly constant, so the plane could visibly lag on some loads. Gated the animation behind a JS-toggled class instead, triggered as the very first statement the script executes (before any of the app's own data or logic runs) — a specific, deterministic point rather than implicit paint timing. Verified directly: the class is present immediately on load, and the opacity timeline through the fly-in/fly-out sequence matches the intended timing exactly (invisible early, fully visible mid-sequence, faded back out by the end)."},
   {v:"v0.106.0",d:"Live Data Integrity: FlightLogger, ERSA, Airspace Boundaries, and CASA Part 61 MOS now only show green on a real, live confirmation — not a static flag. FlightLogger is checked by actually calling the proxy's /fleet endpoint. ERSA/Airspace/CASA MOS are checked by confirming their real external sources (Airservices Australia's AIP, CASA's regulatory framework) are genuinely reachable right now, via two new proxy endpoints (/reachability/casa, /reachability/airservices) — a browser can't get an honest answer to this itself, since a cross-origin check against a site that hasn't opted into CORS gets blocked before any real status is visible, which would misreport as 'down' even when the site is fine; doing the check server-side avoids that entirely. Deliberately built as two specific, hardcoded endpoints rather than one general 'check any URL' endpoint, since an open URL-fetcher would let the proxy be used to probe arbitrary third-party sites. Removed the now-served-its-purpose round-116 debug introspection endpoint at the same time. Verified all the real scenarios directly, not just the happy path: mixed success/failure (FlightLogger and CASA reachable, Airservices Australia unreachable) correctly showed green/red per entry, not uniformly; a complete proxy outage correctly showed every live-checked entry as failed with honest text, not a false green or an unhandled error; and the eventual locked-in final state (after the full spin-in sequence completes) correctly reflects whichever real result came back, confirmed by checking the actual frozen border color, not just the class name."},
