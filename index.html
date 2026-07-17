@@ -1580,6 +1580,37 @@ const $=s=>document.querySelector(s);
 // didn't ask for. Confirmed with a real test (round 99) that this is what
 // actually happens, not assumed.
 
+// Timezone-correct conversion between UTC (what FlightLogger returns/expects
+// over the API) and local time (what every slot label like "08:00" in this
+// app actually means) — round 112, fixing a real bug. FlightLogger returns
+// datetimes in UTC; the old code sliced the raw ISO string directly
+// (startsAt.slice(0,10)/(11,16)), silently treating UTC clock digits as if
+// they were local time. Confirmed with real data: a window stored as
+// 22:00-07:00 UTC is actually 08:00-17:00 LOCAL in Melbourne (UTC+10 in
+// July, no daylight saving) — an entirely ordinary working day that the
+// slicing approach could never have recognized, since "22:00" and "08:00"
+// never match no matter what's actually being compared. Relies on the
+// browser's own local timezone via standard Date methods — correct as long
+// as this runs from Australia/Melbourne, the real, intended usage context;
+// would need revisiting if ever used from elsewhere.
+function localDateStr(isoString){
+  const d=new Date(isoString);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function localTimeStr(isoString){
+  const d=new Date(isoString);
+  return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+// Builds a correct UTC ISO string FROM a local date + local time, for
+// sending API requests — the reverse of the above, same bug in the other
+// direction (fromDate+"T00:00:00Z" treats a local date string as if it were
+// already UTC midnight, which is wrong the moment the local offset isn't 0).
+function localDateTimeToIso(dateStr,timeStr){
+  const [y,mo,d]=dateStr.split("-").map(Number);
+  const [h,mi]=(timeStr||"00:00").split(":").map(Number);
+  return new Date(y,mo-1,d,h,mi,0).toISOString();
+}
+
 function timeToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
 function minutesToTime(m){ const h=Math.floor(m/60), mm=m%60; return `${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; }
 
@@ -1765,11 +1796,11 @@ function checkInstructorAvailability(instructorId,date,slotStart,slotEnd,availab
   }
   const windows=availabilityByInstructor[instructorId];
   if(!windows||!windows.length) return null;
-  const dayWindows=windows.filter(w=>w.startsAt.slice(0,10)===date);
+  const dayWindows=windows.filter(w=>localDateStr(w.startsAt)===date);
   if(!dayWindows.length) return null;
-  const blocked=dayWindows.some(w=>w.unavailable && timeOverlap(slotStart,slotEnd,w.startsAt.slice(11,16),w.endsAt.slice(11,16)));
+  const blocked=dayWindows.some(w=>w.unavailable && timeOverlap(slotStart,slotEnd,localTimeStr(w.startsAt),localTimeStr(w.endsAt)));
   if(blocked) return false;
-  const covered=dayWindows.some(w=>!w.unavailable && timeOverlap(slotStart,slotEnd,w.startsAt.slice(11,16),w.endsAt.slice(11,16)));
+  const covered=dayWindows.some(w=>!w.unavailable && timeOverlap(slotStart,slotEnd,localTimeStr(w.startsAt),localTimeStr(w.endsAt)));
   return covered?true:null;
 }
 
@@ -1841,8 +1872,8 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg,realIn
   let availabilityByInstructor={};
   if(requireInstructor){
     const instructorIds=activeStudents.map(s=>s.primaryInstructorId).filter(Boolean);
-    const fromIso=new Date(fromDate+"T00:00:00Z").toISOString();
-    const toIso=new Date(toDate+"T23:59:59Z").toISOString();
+    const fromIso=localDateTimeToIso(fromDate,"00:00");
+    const toIso=localDateTimeToIso(toDate,"23:59");
     availabilityByInstructor=await fetchInstructorAvailability(instructorIds,fromIso,toIso);
   }
 
@@ -1854,15 +1885,15 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg,realIn
       const candidateTails=FLEET.filter(f=>student.aircraftTypesNeeded.includes(f.type));
       for(const ac of candidateTails){
         const aircraftBookings=(realAircraftBookingsByReg[ac.reg]||[])
-          .filter(b=>b.startsAt.slice(0,10)===date)
-          .map(b=>({start:b.startsAt.slice(11,16),end:b.endsAt.slice(11,16)}));
+          .filter(b=>localDateStr(b.startsAt)===date)
+          .map(b=>({start:localTimeStr(b.startsAt),end:localTimeStr(b.endsAt)}));
         // Merged, not checked separately — a slot must be free for BOTH the
         // aircraft and the instructor at once, not just each independently.
         let occupied=aircraftBookings;
         if(requireInstructor){
           const instructorBookings=(realInstructorBookingsById[student.primaryInstructorId]||[])
-            .filter(b=>b.startsAt.slice(0,10)===date)
-            .map(b=>({start:b.startsAt.slice(11,16),end:b.endsAt.slice(11,16)}));
+            .filter(b=>localDateStr(b.startsAt)===date)
+            .map(b=>({start:localTimeStr(b.startsAt),end:localTimeStr(b.endsAt)}));
           occupied=occupied.concat(instructorBookings);
         }
         const slots=findAllFreeSlots(occupied,lessonMinutes);
@@ -1891,8 +1922,8 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg,realIn
 }
 
 async function fetchRealBookings(fromDate,toDate){
-  const from=new Date(fromDate+"T00:00:00Z").toISOString();
-  const to=new Date(toDate+"T23:59:59Z").toISOString();
+  const from=localDateTimeToIso(fromDate,"00:00");
+  const to=localDateTimeToIso(toDate,"23:59");
   const res=await fetch(`${FLIGHTLOGGER_PROXY}/bookings-range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
   if(!res.ok) throw new Error(`bookings-range fetch failed: ${res.status}`);
   const flat=await res.json();
@@ -2059,7 +2090,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.101.0";
+const VERSION="v0.102.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2699,6 +2730,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.102.0",d:"Fixed a real, systemic timezone bug — every 'Not confirmed' instructor-availability result was wrong, not honest. FlightLogger returns availability/booking times in UTC; every date/time comparison in this app was slicing the raw UTC string directly, silently treating UTC clock digits as local time. Confirmed with real data the user pasted: a window stored as 22:00-07:00 UTC is actually 08:00-17:00 LOCAL in Melbourne (UTC+10 in July) — an entirely ordinary working day, unrecognizable to the old code since 22:00 and 08:00 never match no matter what's being compared. Fixed properly in both directions: added real local-time conversion helpers (localDateStr/localTimeStr for reading API responses, localDateTimeToIso for building API requests), and replaced every instance of raw .slice(0,10)/.slice(11,16) across instructor availability, aircraft bookings, and instructor bookings — seven separate spots, not a one-line patch. Verified with the user's own real availability data, browser timezone forced to Australia/Melbourne to match real usage: the exact same real data that showed 'Not confirmed' for everything now correctly shows 'Confirmed available' for every slot on the matching day. Also verified the reverse direction — checked the actual outgoing API request URL and confirmed a requested local day now converts to the correct UTC boundaries, rather than starting 10 hours late and missing the early morning."},
   {v:"v0.101.0",d:"Scheduling: three real changes, all from direct feedback that every suggested slot was 08:00-10:00 regardless of student, day, or aircraft. Root cause was worse than it looked — the matching logic only ever checked a candidate slot against real FlightLogger bookings, never against OTHER suggestions already generated in the same run, so two students needing the same aircraft type on the same day (with nothing real blocking either yet) both independently landed on the exact same first-available slot. Confirmed this with a real example: Zane Walker and Harold Leung, both suggested VH-MNN at 08:00-10:00 on the same date — a genuine double-booking if both had been confirmed. Per instruction, didn't silently auto-resolve this by pushing one later (which an earlier fix attempt had done) — instead built a proper conflict-marking pass: both suggestions still show, sorted next to each other, with a red '⚠ conflict' note explaining why (same aircraft or same instructor — same-instructor wins the label when both apply, since one person genuinely can't be in two places, and this is now deterministic regardless of which pair gets compared first). Also: a day with real open time now offers every slot that fits, not just the earliest (a fully free 08:00-17:00 day with 2hr lessons gives four options, not one) — this is what actually fixed the 'always 08:00' pattern, the conflict-marking was a separate, additional fix for the double-booking risk underneath it. Added a real length slider (0.5-4hrs, half-hour steps, defaults to 2) replacing the fixed constant. Caught and fixed one real bug before shipping: sorting suggestions for display without sorting the same array before storing it would have made the Confirm button act on the wrong row the moment sorting reordered anything — fixed by sorting once, upfront, so what's stored and what's shown always match."},
   {v:"v0.100.0",d:"Two real fixes to the round-109 day-filter feature, found by re-testing it rather than trusting the previous entry's claim. First: building this same feature landed twice in the same file — a duplicate HTML container and JS function got added on top of the one that already existed, which would have silently broken things (the button handler was reading checkboxes from a different element ID than either duplicate was writing to). Cleaned up, one implementation remains. Second, a genuine bug in the surviving implementation: a student with truly empty mastersheet availability (Matthew Rogers) doesn't get the 'all days checked' default the code intended — checking .includes() on an empty array is always false, so every checkbox came back unchecked instead. This directly contradicts what round 109's own changelog claimed was tested. Fixed properly this time and re-verified: Matthew now correctly presets to all 7 days with a clear note explaining why, and produces real suggestions (61, not the 0 he was permanently stuck on) without needing to manually re-check anything first."},
   {v:"v0.99.0",d:"Added a day-of-week checkbox filter to Scheduling, pre-set from whichever student's real mastersheet availability is selected — picking Zane Walker pre-checks Sat/Sun, since that's what he actually listed, fully adjustable from there. Two different, deliberate behaviors depending on scope: with 'All students' selected, the day filter narrows the group (intersects with each student's own days — narrowing to Tuesday-only correctly kept exactly the three students who actually listed Tuesday, no one else); with one specific student selected, the filter fully overrides their mastersheet days, since that's deliberate manual control — tested this specifically with Matthew Rogers, whose mastersheet availability is genuinely empty ('awaiting availability from student'), manually checked Wednesday for him, and confirmed real suggestions came back for him on Wednesday, rather than him being permanently stuck with zero results. Unchecking every day is caught with a clear error, same discipline as the date-range validation from last round."},
