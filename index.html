@@ -787,26 +787,30 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
         <div class="mr-block">
           <div class="mr-part-label">Part 1 — Maintenance Requirements <span id="mrPart1LiveTag" style="font-weight:600; font-size:11px; text-transform:none; letter-spacing:0"></span></div>
           <div class="hint" style="margin-bottom:var(--u3)">Lists maintenance that will fall due during this release's validity period, and when. This section doesn't certify completion itself — once something's done, it's transferred to Part 2 or the aircraft log book and certified there, then this row is marked complied-with.</div>
-          <div class="mr-header-grid">
-            <div class="f"><label>Maintenance Release No.</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Aircraft Type</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Registration</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Expires (date)</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Expires (hours)</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Issued by</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Signed</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Aircraft TTIS at issue</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Time</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Date</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Place</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>AME licence/authority no.</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Operational Category</label><input type="text" placeholder="—"></div>
-            <div class="f"><label>Schedules/System of Maintenance</label><input type="text" placeholder="—"></div>
+          <div class="mr-header-grid" id="mrPart1Fields">
+            <div class="f"><label>Maintenance Release No.</label><input type="text" placeholder="—" data-field="mrNumber"></div>
+            <div class="f"><label>Aircraft Type</label><input type="text" placeholder="—" data-field="aircraftType"></div>
+            <div class="f"><label>Registration</label><input type="text" placeholder="—" data-field="registration"></div>
+            <div class="f"><label>Expires (date)</label><input type="text" placeholder="—" data-field="expiresDate"></div>
+            <div class="f"><label>Expires (hours)</label><input type="text" placeholder="—" data-field="expiresHours"></div>
+            <div class="f"><label>Issued by</label><input type="text" placeholder="—" data-field="issuedBy"></div>
+            <div class="f"><label>Signed</label><input type="text" placeholder="—" data-field="signed"></div>
+            <div class="f"><label>Aircraft TTIS at issue</label><input type="text" placeholder="—" data-field="ttisAtIssue"></div>
+            <div class="f"><label>Time</label><input type="text" placeholder="—" data-field="time"></div>
+            <div class="f"><label>Date</label><input type="text" placeholder="—" data-field="date"></div>
+            <div class="f"><label>Place</label><input type="text" placeholder="—" data-field="place"></div>
+            <div class="f"><label>AME licence/authority no.</label><input type="text" placeholder="—" data-field="ameLicence"></div>
+            <div class="f"><label>Operational Category</label><input type="text" placeholder="—" data-field="operationalCategory"></div>
+            <div class="f"><label>Schedules/System of Maintenance</label><input type="text" placeholder="—" data-field="schedules"></div>
           </div>
           <div class="mr-checkrow" style="display:flex; gap:var(--u5); margin:-var(--u2) 0 var(--u4); flex-wrap:wrap">
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto"> IFR</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto"> VFR Night</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto"> VFR Day</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto" data-field="ifr"> IFR</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto" data-field="vfrNight"> VFR Night</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text)"><input type="checkbox" style="width:auto" data-field="vfrDay"> VFR Day</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:var(--u3); margin-bottom:var(--u4)">
+            <button class="mr-trial-submit" id="mrPart1SaveBtn" style="margin:0">Save Part 1</button>
+            <span class="hint" id="mrPart1SaveStatus" style="margin:0"></span>
           </div>
           <div style="overflow-x:auto">
             <table class="mr-table">
@@ -2111,7 +2115,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.112.0";
+const VERSION="v0.113.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2663,6 +2667,60 @@ document.body.addEventListener("click",async e=>{
   }
 });
 
+// Round 126 — Part 1's header fields are now genuinely persistent, per
+// aircraft, matching the same principle already built for Part 2: type
+// into any field, push it to real storage, come back later and edit it
+// again. Unlike Part 2 (an ongoing list of separate defect entries), Part
+// 1 is one coherent record per aircraft — the whole header block saves
+// together via one "Save Part 1" action, rather than 14 separate buttons,
+// since that's how the real paper form actually works (filled in once,
+// together, when the release is issued). Fields stay fully editable
+// after saving; clicking Save again just updates the same record.
+let mrPart1CurrentReg=null;
+async function loadMrPart1Data(reg){
+  mrPart1CurrentReg=reg;
+  const statusEl=$("#mrPart1SaveStatus");
+  const fieldsWrap=$("#mrPart1Fields");
+  if(statusEl) statusEl.textContent="Loading saved Part 1 data…";
+  try{
+    const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr1/${encodeURIComponent(reg)}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const record=await res.json();
+    fieldsWrap.querySelectorAll("[data-field]").forEach(el=>{ el.value=record?.[el.dataset.field]||""; });
+    document.querySelectorAll('.mr-checkrow [data-field]').forEach(el=>{ el.checked=!!record?.[el.dataset.field]; });
+    if(statusEl) statusEl.textContent=record?.updatedAt?`Last saved ${record.updatedAt.slice(0,10)}`:"No saved data yet for this aircraft.";
+  }catch(err){
+    fieldsWrap.querySelectorAll("[data-field]").forEach(el=>{ el.value=""; });
+    document.querySelectorAll('.mr-checkrow [data-field]').forEach(el=>{ el.checked=false; });
+    if(statusEl) statusEl.textContent=`Couldn't load saved data (${err.message}).`;
+  }
+}
+document.body.addEventListener("click",async e=>{
+  const saveBtn=e.target.closest("#mrPart1SaveBtn"); if(!saveBtn) return;
+  if(!mrPart1CurrentReg){
+    alert("Select an aircraft first.");
+    return;
+  }
+  const body={};
+  $("#mrPart1Fields").querySelectorAll("[data-field]").forEach(el=>{ body[el.dataset.field]=el.value.trim(); });
+  document.querySelectorAll('.mr-checkrow [data-field]').forEach(el=>{ body[el.dataset.field]=el.checked; });
+  saveBtn.disabled=true; saveBtn.textContent="Saving…";
+  try{
+    const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr1/${encodeURIComponent(mrPart1CurrentReg)}`,{
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body),
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const record=await res.json();
+    $("#mrPart1SaveStatus").textContent=`Saved — last saved ${record.updatedAt.slice(0,10)}`;
+  }catch(err){
+    $("#mrPart1SaveStatus").textContent=`Couldn't save (${err.message}).`;
+  }finally{
+    saveBtn.disabled=false; saveBtn.textContent="Save Part 1";
+  }
+});
+
 function renderMrPart1FromLive(parts){
   const tag=$("#mrPart1LiveTag");
   if(!parts||!parts.length){
@@ -2719,6 +2777,7 @@ async function showLiveOnlyDetail(reg){
     renderLiveWarningBand("#maintGaugePanel", detail.worstMaintenanceWarning);
     $("#maintGaugePanel").innerHTML+=`<div class="hint" style="margin-top:var(--u3)">This aircraft's detailed maintenance-parts records aren't available yet — the connected FlightLogger account can see warnings but not full parts history for aircraft outside VH-KAI. See VH-KAI for the full parts table (static snapshot).</div>`;
     renderMrPart2Trial($("#maintMrPart2Static"),detail.callSign,detail.model);
+    loadMrPart1Data(detail.callSign);
   }catch(err){
     console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
     $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="color:var(--amber)">Live detail fetch failed — try again shortly.</div>`;
@@ -2753,6 +2812,7 @@ $("#maintTiles").addEventListener("click",e=>{
         renderLiveWarningBand("#maintLiveBand", detail.worstMaintenanceWarning);
         renderMrPart1FromLive(detail.maintenanceParts);
         renderMrPart2Trial($("#maintMrPart2Static"),detail.callSign,detail.model);
+        loadMrPart1Data(detail.callSign);
       }catch(err){
         console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
         $("#maintLiveBand").innerHTML=`<div class="hint" style="color:var(--amber)">Live warning fetch failed — showing static data only above.</div>`;
@@ -3126,6 +3186,7 @@ async function runLiveIntegrityCheck(c,i){
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
 const CHANGELOG=[
+  {v:"v0.113.0",d:"Extended the same real-persistence principle to Part 1's header fields — Maintenance Release No., expiry, issued-by, and the rest, plus the IFR/VFR Night/VFR Day checkboxes, per aircraft, via a new proxy endpoint (GET/PUT /mr1/:reg, same MR_DATA KV store as Part 2, different key prefix). One 'Save Part 1' action covers the whole header block together, rather than 14 separate buttons — that's a deliberate design choice, not a partial implementation: a Part 1 header describes one coherent release for one aircraft, filled in together, unlike Part 2's ongoing list of separate defect entries which each need their own save. Fields stay fully editable after saving; selecting a different aircraft correctly shows that aircraft's own saved data (or genuinely empty fields if nothing's been saved for it yet), and clicking Save again on the same aircraft updates the same record rather than creating a duplicate. Verified all three directly: saved values for one aircraft, confirmed a different aircraft showed empty fields rather than leaking the first one's data, then edited and re-saved the original aircraft's value and confirmed the update stuck rather than silently reverting."},
   {v:"v0.112.0",d:"Three real changes to the trial Maintenance Release Part 2 system. First, fixed the display order — Part 2 now genuinely sits between Part 1 and Part 3 in the page, always, for every aircraft. It previously lived in a completely different part of the page (the tile-click detail panel, above Part 1 entirely) because its container happened to be positioned there, not because of any deliberate ordering logic — moved it into a fixed container physically placed between the two static blocks, which is what actually fixes it, not just relabeling. Second, defect and rectification are now genuinely separate steps, matching how a real Maintenance Release Part 2 actually works — an endorsement and its clearing endorsement are recorded separately, often by different people with different licences. A defect can now be logged with just the defect and who reported it; the rectification and who rectified it can be added later, by someone else entirely, via a real 'Add rectification' action. Third, every entry can now be edited or deleted outright — real PATCH/DELETE endpoints on the proxy, not just create-and-forget. Verified all of it directly: the Part 1→2→3 order for both the generic and VH-KAI-specific views, a defect-only entry correctly showing 'Not yet rectified' until a real rectification is added by a different named person, editing changing the stored text and removing the old value, and deleting genuinely removing the entry rather than just hiding it."},
   {v:"v0.111.0",d:"Fixed a real consistency risk between the Home page's Live Data Integrity and the Maintenance page's own connection indicator — they were each making their own separate call to the exact same /fleet endpoint, meaning they could genuinely show different results from ordinary network timing alone, no bug required. Replaced both with a single shared connectivity check that every place reads from, so they can no longer structurally disagree — confirmed directly by counting actual network calls (exactly one /fleet request now, not two, across both pages together) rather than just checking the displayed text matched. Also corrected 'Aircraft Maintenance Data (FlightLogger),' per direct instruction: the underlying FlightLogger connection is genuinely real (the same one used everywhere else in the app), it's specifically the detailed parts/records sub-feature that's blocked by a permission boundary — now shows green/green/amber (connected, not fully integrated), the same honest pattern already used for ERSA/Airspace/CASA MOS, rather than a flat red implying nothing works at all. Verified both the success and failure cases stay consistent across both pages, not just the happy path."},
   {v:"v0.110.0",d:"Removed the static VH-XPP Maintenance Release example entirely — the specific example values in Part 1's header fields (MR number, expiry, issued-by, etc.) and the whole static Part 2 'Endorsements' table (now redundant with the real, per-aircraft trial system from last round) are gone. The layout, paper-form styling, and table structure stay exactly as they were — kept deliberately as the visual/structural reference for how this data should look, per instruction — just with no misleading example values sitting in it regardless of which aircraft is actually selected. Part 1's maintenance-requirements table is now genuinely empty until real live data populates it (still works correctly for VH-KAI, confirmed after the change). Part 3 (daily inspection/time-in-service log) is untouched — it was already an empty structural template with no specific example values, so nothing about it was actually 'the XPP sheet' in the first place."},
