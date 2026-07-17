@@ -2098,7 +2098,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.105.0";
+const VERSION="v0.106.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2703,13 +2703,13 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // to jump to.
 const INTEGRITY_CHECKS=[
   {label:"LTF SOPs & Forms (Google Drive)", warn:"Google Drive API not connected — figures not live, not for operational use.", link:{view:"signout"}},
-  {label:"FlightLogger (Bookings & Student Currency)", ok:true, warn:"Live via FlightLogger API — bookings and student currency data confirmed real."},
+  {label:"FlightLogger (Bookings & Student Currency)", warn:"Checking FlightLogger API...", warnOk:"Live via FlightLogger API — bookings and student currency data confirmed real.", warnFail:"FlightLogger API unreachable right now — bookings and student currency data not currently live.", liveCheck:{type:"proxy", path:"/fleet"}},
   {label:"Aircraft Maintenance Status", warn:"Google Drive API not connected — MR/unserviceability status not live."},
   {label:"Aircraft Maintenance Data (FlightLogger)", warn:"FlightLogger permission boundary — maintenance parts/records not accessible with the current token."},
-  {label:"ERSA (Aerodrome Data)", warn:"No live aerodrome data source connected — not for operational use.", externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10"},
+  {label:"ERSA (Aerodrome Data)", warn:"Checking Airservices Australia AIP...", warnOk:"Airservices Australia AIP confirmed reachable — real source available, not yet integrated into this app.", warnFail:"Airservices Australia AIP unreachable right now — not for operational use.", externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10", liveCheck:{type:"reachability", key:"airservices"}},
   {label:"NOTAMs / Area NOTAMs", warn:"NOTAM feed not connected.", link:{view:"signout", sub:"navmap"}},
-  {label:"Airspace Boundaries (CTA/PRD)", warn:"No live airspace data source — map overlay not connected.", externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10"},
-  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", warn:"Qualifying-flight thresholds not synced to any live MOS source.", externalLink:"https://www.casa.gov.au/rules/regulatory-framework"},
+  {label:"Airspace Boundaries (CTA/PRD)", warn:"Checking Airservices Australia AIP...", warnOk:"Airservices Australia AIP confirmed reachable — real source available, map overlay not yet integrated.", warnFail:"Airservices Australia AIP unreachable right now — map overlay not connected.", externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10", liveCheck:{type:"reachability", key:"airservices"}},
+  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", warn:"Checking CASA regulatory framework...", warnOk:"CASA regulatory framework page confirmed reachable — real source available, not yet synced into qualifying-flight thresholds.", warnFail:"CASA regulatory framework page unreachable right now.", externalLink:"https://www.casa.gov.au/rules/regulatory-framework", liveCheck:{type:"reachability", key:"casa"}},
   {label:"Live Weather (TAFs / AWIS)", warn:"Live weather integration not connected — current TAFs/AWIS not available."},
   {label:"WhatsApp API"},
 ];
@@ -2734,6 +2734,49 @@ $("#intGrid").addEventListener("click",e=>{
   goView(c.link.view);
   if(c.link.sub) setTimeout(()=>goSub(c.link.sub),50);
 });
+
+// Real live checks (round 119) — these three entries only ever show green
+// once actually confirmed, not on a static flag. FlightLogger is checked by
+// calling the proxy's own /fleet endpoint for real. ERSA/Airspace/CASA MOS
+// don't have any app-side integration to check, so instead confirm the
+// real external source is genuinely reachable right now, via the proxy's
+// new /reachability endpoints — a browser can't get an honest answer to
+// this itself (a cross-origin fetch to a site that hasn't opted into CORS
+// gets blocked before any real status is visible, which would misreport as
+// "down" even when the site is fine), so this has to go through something
+// that can make the request server-side. Runs in parallel with the spin-in
+// animation, not blocking it — updates both the underlying data (so the
+// existing lock-in logic below picks up the correct final state) and the
+// visible DOM immediately, so the result doesn't just sit correct-but-
+// invisible until the whole sequence finishes.
+async function runLiveIntegrityCheck(c,i){
+  if(!c.liveCheck) return;
+  let ok=false;
+  try{
+    if(c.liveCheck.type==="proxy"){
+      const res=await fetch(`${FLIGHTLOGGER_PROXY}${c.liveCheck.path}`);
+      ok=res.ok;
+    }else if(c.liveCheck.type==="reachability"){
+      const res=await fetch(`${FLIGHTLOGGER_PROXY}/reachability/${c.liveCheck.key}`);
+      const data=await res.json();
+      ok=!!(res.ok && data.reachable);
+    }
+  }catch(err){
+    ok=false; // network failure, CORS, proxy unreachable, etc. — honestly not confirmed
+  }
+  c.ok=ok;
+  const row=document.querySelectorAll("#intGrid .sopcheck")[i];
+  if(!row) return;
+  const spinner=row.querySelector(".sop-spinner");
+  const warnEl=row.querySelector(".sop-warning");
+  spinner.classList.toggle("ok",ok);
+  warnEl.classList.toggle("ok",ok);
+  const prefix=ok?"[FETCH SUCCESS]":"[FETCH FAILED]";
+  const rest=ok?c.warnOk:c.warnFail;
+  warnEl.innerHTML=`<span class="sop-prefix">${prefix}</span>${rest?` — ${rest}`:''}`;
+}
+INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
+
 // Once the full sequence has naturally played through once, lock every
 // checker into its final look via inline styles (highest specificity,
 // overrides the CSS animation outright) rather than leaving it to the
@@ -2759,6 +2802,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.106.0",d:"Live Data Integrity: FlightLogger, ERSA, Airspace Boundaries, and CASA Part 61 MOS now only show green on a real, live confirmation — not a static flag. FlightLogger is checked by actually calling the proxy's /fleet endpoint. ERSA/Airspace/CASA MOS are checked by confirming their real external sources (Airservices Australia's AIP, CASA's regulatory framework) are genuinely reachable right now, via two new proxy endpoints (/reachability/casa, /reachability/airservices) — a browser can't get an honest answer to this itself, since a cross-origin check against a site that hasn't opted into CORS gets blocked before any real status is visible, which would misreport as 'down' even when the site is fine; doing the check server-side avoids that entirely. Deliberately built as two specific, hardcoded endpoints rather than one general 'check any URL' endpoint, since an open URL-fetcher would let the proxy be used to probe arbitrary third-party sites. Removed the now-served-its-purpose round-116 debug introspection endpoint at the same time. Verified all the real scenarios directly, not just the happy path: mixed success/failure (FlightLogger and CASA reachable, Airservices Australia unreachable) correctly showed green/red per entry, not uniformly; a complete proxy outage correctly showed every live-checked entry as failed with honest text, not a false green or an unhandled error; and the eventual locked-in final state (after the full spin-in sequence completes) correctly reflects whichever real result came back, confirmed by checking the actual frozen border color, not just the class name."},
   {v:"v0.105.0",d:"Live Data Integrity: ERSA, Airspace Boundaries (CTA/PRD), and CASA Part 61 MOS now link out to their real authoritative sources on click — Airservices Australia's AIP for ERSA/Airspace, CASA's regulatory framework page for Part 61 MOS — opening in a new tab rather than navigating within the app, since these are real external destinations. NOTAMs keeps its existing in-app Nav Map link, unaffected."},
   {v:"v0.104.0",d:"Live Data Integrity, Home page: every checker now reflects real, current connection status. FlightLogger (Bookings & Student Currency) shows connected — genuinely live and tested via the proxy. Aircraft Maintenance Data (FlightLogger) shows not-connected with an accurate reason (a permission boundary blocks maintenance-record reads on the current token). Checkers with a genuinely relevant page in the app are now clickable: LTF SOPs jumps to Solo Signout, and ERSA/NOTAMs/Airspace/CASA MOS all jump specifically to the Nav Map subview within it. Deliberately no link for checkers whose relevant page is Scheduling, Maintenance, or YMMB — those are behind the 6-click gate on purpose, and a prominent, obvious Home-page shortcut straight to them would defeat the point of gating them at all. Verified every link directly: each navigates to the correct destination (including the Nav Map subview specifically activating, not just Solo Signout generally), and checkers without a link do nothing on click rather than failing silently or going somewhere wrong."},
   {v:"v0.103.0",d:"Ran a real, conservative stress test against the proxy (with FlightLogger's own team's go-ahead) and found two genuine bugs, not the result we expected. The test never actually hit FlightLogger's rate limiter as a clean 429 from the app's perspective — it consistently failed at 6-7 requests/second as an opaque 502 instead. Confirmed via wrangler tail that FlightLogger WAS returning a real 429 with a proper rate-limit message the whole time — the proxy's own error handling was flattening every kind of failure (a real, informative rate-limit response included) into the same generic 502, discarding the one piece of information a caller actually needs to back off correctly. Fixed surgically: the proxy now passes through a real 429 with its Retry-After header specifically, while still hiding every other kind of failure behind the generic message, same reasoning as before for anything that isn't a standard, expected signal. Found a second, related bug while verifying the first fix in isolation: even with the real header being set correctly on the wire, cross-origin JavaScript (which is exactly LTF OS's real situation, calling out to a different Workers.dev origin) silently can't read a non-default response header unless the server explicitly opts in via Access-Control-Expose-Headers — which the proxy never did. Confirmed both the bug and the fix directly: an isolated test without the header showed the browser silently returning null for Retry-After despite the server sending '30'; the identical test with the header added correctly returned '30'. Also added clear, specific rate-limit messaging in the app's own fetch error handling, now that the real signal exists to build it from."},
