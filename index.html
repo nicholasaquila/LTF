@@ -964,7 +964,21 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
               <option value="true" selected>Dual (instructor required)</option>
               <option value="false">Solo (no instructor needed)</option>
             </select></label>
+            <label class="f" style="margin:0"><span style="font-size:11px">Length: <span id="schedLengthLabel">2.0 hr</span></span><input type="range" id="schedLessonLength" min="0.5" max="4" step="0.5" value="2" style="width:150px"></label>
           </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:var(--u3); flex-wrap:wrap; margin-bottom:var(--u4)">
+          <span style="font-size:11px; color:var(--dim)">Days</span>
+          <div id="schedDayFilter" style="display:flex; gap:var(--u3); flex-wrap:wrap">
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Sun" checked>Sun</label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Mon" checked>Mon</label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Tue" checked>Tue</label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Wed" checked>Wed</label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Thu" checked>Thu</label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Fri" checked>Fri</label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px"><input type="checkbox" value="Sat" checked>Sat</label>
+          </div>
+          <span class="hint" id="schedDayFilterNote" style="font-size:11px"></span>
         </div>
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--u3)">
           <div class="plabel" style="margin-bottom:0">Suggested Matches</div>
@@ -1759,16 +1773,71 @@ function checkInstructorAvailability(instructorId,date,slotStart,slotEnd,availab
   return covered?true:null;
 }
 
-// Real-data matching: fixed lesson length + REAL aircraft-booking conflicts
-// + REAL instructor double-booking conflicts (round 107) + REAL instructor
-// availability (round 104) when the flight actually needs one (round 105).
-// fromDate/toDate (round 108, explicit date-range filter) and
-// requireInstructor are both adjustable from the UI. studentIdFilter, if
-// set to a real student id, restricts matching to just that one student —
-// "all" or falsy means every active student, same as before.
-async function generateRealSuggestions(students,realAircraftBookingsByReg,realInstructorBookingsById,fromDate,toDate,requireInstructor,studentIdFilter){
-  let activeStudents=students.filter(s=>s.availableDays.length);
-  if(studentIdFilter && studentIdFilter!=="all") activeStudents=activeStudents.filter(s=>s.id===studentIdFilter);
+// All non-overlapping lesson-length windows within the duty day, after
+// removing occupied bookings — round 111, replaces the old "just the
+// first slot" behavior. An open day now offers every real option it has
+// (e.g. a fully free 08:00-17:00 day with 2hr lessons gives four slots,
+// not one), rather than showing only the earliest.
+function findAllFreeSlots(occupied,lessonMinutes){
+  const free=subtractBookings(SCHED_DUTY_START,SCHED_DUTY_END,occupied);
+  const slots=[];
+  free.forEach(f=>{
+    let cursor=timeToMinutes(f.start);
+    const end=timeToMinutes(f.end);
+    while(cursor+lessonMinutes<=end){
+      slots.push({start:minutesToTime(cursor),end:minutesToTime(cursor+lessonMinutes)});
+      cursor+=lessonMinutes;
+    }
+  });
+  return slots;
+}
+
+// Marks (doesn't remove) suggestions that genuinely conflict with each
+// other — same date, overlapping time, same aircraft or same instructor,
+// different students (round 111, replacing round 110's auto-avoidance per
+// explicit instruction: showing both and flagging the clash gives a human
+// the choice, rather than the algorithm silently deciding who gets pushed
+// to a worse time). Same student appearing twice isn't a conflict — that's
+// just two real options for the same person.
+function markConflicts(suggestions){
+  for(let i=0;i<suggestions.length;i++){
+    for(let j=i+1;j<suggestions.length;j++){
+      const a=suggestions[i], b=suggestions[j];
+      if(a.date!==b.date || a.studentId===b.studentId) continue;
+      if(!timeOverlap(a.start,a.end,b.start,b.end)) continue;
+      const sameAircraft=a.aircraftReg===b.aircraftReg;
+      const sameInstructor=a.instructorRequired && b.instructorRequired && a.primaryInstructorId && a.primaryInstructorId===b.primaryInstructorId;
+      if(!sameAircraft && !sameInstructor) continue;
+      const key=a.conflictGroup||b.conflictGroup||`${a.date}|${a.start}|${sameInstructor?a.primaryInstructorId:a.aircraftReg}`;
+      a.conflictGroup=key; b.conflictGroup=key;
+      // Same-instructor is the more fundamental constraint when both apply
+      // (one person genuinely can't be two places; a shared aircraft is
+      // secondary if it's also the same instructor anyway) — set once and
+      // never downgraded by a later same-aircraft-only pairing found
+      // afterward in the loop, so this stays correct regardless of
+      // processing order, not just whichever pair happens to run last.
+      if(sameInstructor){ a.conflictReason="same instructor"; b.conflictReason="same instructor"; }
+      else if(!a.conflictReason){ a.conflictReason="same aircraft"; b.conflictReason="same aircraft"; }
+    }
+  }
+}
+
+// Real-data matching: REAL aircraft-booking conflicts + REAL instructor
+// double-booking conflicts (round 107) + REAL instructor availability
+// (round 104) when the flight actually needs one (round 105). fromDate/
+// toDate (round 108), requireInstructor, dayFilter (round 109), and now
+// lessonMinutes (round 111, from the length slider — default 120) are all
+// adjustable from the UI. studentIdFilter, if set to a real student id,
+// restricts matching to just that one student. dayFilter behaves
+// differently depending on scope, deliberately: in "all students" mode it
+// INTERSECTS with each student's own mastersheet days; for one specifically
+// selected student it REPLACES their mastersheet days entirely (deliberate
+// manual control — lets a student with no stated availability, like
+// Matthew Rogers, still be searched if the user sets real days here).
+async function generateRealSuggestions(students,realAircraftBookingsByReg,realInstructorBookingsById,fromDate,toDate,requireInstructor,studentIdFilter,dayFilter,lessonMinutes){
+  lessonMinutes=lessonMinutes||SCHED_LESSON_MINUTES;
+  const singleStudent=studentIdFilter && studentIdFilter!=="all";
+  let activeStudents=singleStudent?students.filter(s=>s.id===studentIdFilter):students.filter(s=>s.availableDays.length);
   let availabilityByInstructor={};
   if(requireInstructor){
     const instructorIds=activeStudents.map(s=>s.primaryInstructorId).filter(Boolean);
@@ -1779,7 +1848,8 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg,realIn
 
   const suggestions=[];
   activeStudents.forEach(student=>{
-    const dates=datesInRange(student.availableDays,fromDate,toDate);
+    const searchDays=singleStudent?dayFilter:student.availableDays.filter(d=>dayFilter.includes(d));
+    const dates=datesInRange(searchDays,fromDate,toDate);
     dates.forEach(date=>{
       const candidateTails=FLEET.filter(f=>student.aircraftTypesNeeded.includes(f.type));
       for(const ac of candidateTails){
@@ -1787,9 +1857,7 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg,realIn
           .filter(b=>b.startsAt.slice(0,10)===date)
           .map(b=>({start:b.startsAt.slice(11,16),end:b.endsAt.slice(11,16)}));
         // Merged, not checked separately — a slot must be free for BOTH the
-        // aircraft and the instructor at once, not just each independently
-        // (two independent checks could each "pass" on different sub-windows
-        // that don't actually overlap each other).
+        // aircraft and the instructor at once, not just each independently.
         let occupied=aircraftBookings;
         if(requireInstructor){
           const instructorBookings=(realInstructorBookingsById[student.primaryInstructorId]||[])
@@ -1797,27 +1865,28 @@ async function generateRealSuggestions(students,realAircraftBookingsByReg,realIn
             .map(b=>({start:b.startsAt.slice(11,16),end:b.endsAt.slice(11,16)}));
           occupied=occupied.concat(instructorBookings);
         }
-        const free=subtractBookings(SCHED_DUTY_START,SCHED_DUTY_END,occupied);
-        const slot=free.find(f=>timeToMinutes(f.end)-timeToMinutes(f.start)>=SCHED_LESSON_MINUTES);
-        if(!slot) continue;
-        const slotEnd=minutesToTime(timeToMinutes(slot.start)+SCHED_LESSON_MINUTES);
-        let instructorStatus=null;
-        if(requireInstructor){
-          instructorStatus=checkInstructorAvailability(student.primaryInstructorId,date,slot.start,slotEnd,availabilityByInstructor);
-          if(instructorStatus===false) continue; // confirmed blocked — don't suggest this one at all
-        }
-        suggestions.push({
-          studentId:student.id, studentName:student.name, studentUserId:student.userId,
-          primaryInstructor:student.primaryInstructor, primaryInstructorId:student.primaryInstructorId,
-          secondaryInstructor:student.secondaryInstructor, secondaryInstructorId:student.secondaryInstructorId,
-          aircraftReg:ac.reg, date, start:slot.start, end:slotEnd,
-          instructorRequired:!!requireInstructor,
-          instructorVerified:instructorStatus===true, // true only if real data actually confirmed it; meaningless when instructorRequired is false
+        const slots=findAllFreeSlots(occupied,lessonMinutes);
+        if(!slots.length) continue;
+        slots.forEach(slot=>{
+          let instructorStatus=null;
+          if(requireInstructor){
+            instructorStatus=checkInstructorAvailability(student.primaryInstructorId,date,slot.start,slot.end,availabilityByInstructor);
+            if(instructorStatus===false) return; // confirmed blocked — skip just this slot, not the whole day
+          }
+          suggestions.push({
+            studentId:student.id, studentName:student.name, studentUserId:student.userId,
+            primaryInstructor:student.primaryInstructor, primaryInstructorId:student.primaryInstructorId,
+            secondaryInstructor:student.secondaryInstructor, secondaryInstructorId:student.secondaryInstructorId,
+            aircraftReg:ac.reg, date, start:slot.start, end:slot.end,
+            instructorRequired:!!requireInstructor,
+            instructorVerified:instructorStatus===true,
+          });
         });
-        break; // one suggestion per date is enough — don't enumerate every tail
+        break; // still just the first candidate tail with any capacity that day
       }
     });
   });
+  markConflicts(suggestions);
   return suggestions;
 }
 
@@ -1838,6 +1907,12 @@ async function fetchRealBookings(fromDate,toDate){
 let schedCurrentMatches=[]; // whatever's currently rendered, looked up by row index when Confirm is clicked
 function renderSchedResults(matches,mode){
   // mode: "sample" | "real"
+  // Sorted here, once, before storing — so the Confirm button's row index
+  // always matches what's actually in schedCurrentMatches. Sorting only a
+  // display copy while storing the unsorted original was a real bug caught
+  // before shipping: it would have made Confirm act on the wrong row the
+  // moment sorting reordered anything.
+  if(mode==="real") matches=[...matches].sort((a,b)=>(a.date+a.start+a.aircraftReg).localeCompare(b.date+b.start+b.aircraftReg));
   schedCurrentMatches=matches;
   const el=$("#schedResults");
   if(!matches.length){
@@ -1856,9 +1931,11 @@ function renderSchedResults(matches,mode){
     const usedStudentId=$("#schedStudentSelect").value;
     const usedStudentLabel=usedStudentId==="all"?"all students":($("#schedStudentSelect").selectedOptions[0]?.textContent||"selected student");
     const usedSolo=$("#schedInstructorRequired").value==="false";
-    const banner=`<div class="hint" style="margin-bottom:var(--u3)">${usedStudentLabel}, real aircraft-booking conflicts${usedSolo?"":", real instructor double-booking conflicts, and real instructor availability"} — all checked live where FlightLogger has the data. Fixed 2-hour lessons, no brief/debrief buffer yet. Searched ${usedFrom} to ${usedTo}${usedSolo?" — solo flight, instructor checks skipped (none needed)":""}. <span style="color:var(--amber)">"Not confirmed" rows mean no availability data was found either way</span> — genuinely unknown, not assumed fine. Any slot where the instructor already has another student booked, or is confirmed unavailable, is already excluded — not shown at all.</div>`;
-    el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Primary / Secondary Instructor</th><th>Aircraft</th><th>Date</th><th>Window</th><th>Instructor</th><th></th></tr></thead><tbody>
-      ${matches.map((m,i)=>`<tr><td>${m.studentName}</td><td>${m.instructorRequired?`${m.primaryInstructor} / ${m.secondaryInstructor}`:"— (solo)"}</td><td>${m.aircraftReg}</td><td>${m.date}</td><td>${m.start}–${m.end}</td><td style="color:${!m.instructorRequired?'var(--dim)':(m.instructorVerified?'var(--green)':'var(--amber)')}">${!m.instructorRequired?"Not required":(m.instructorVerified?"Confirmed available":"Not confirmed")}</td>
+    const usedLength=$("#schedLessonLength").value;
+    const banner=`<div class="hint" style="margin-bottom:var(--u3)">${usedStudentLabel}, real aircraft-booking conflicts${usedSolo?"":", real instructor double-booking conflicts, and real instructor availability"} — all checked live where FlightLogger has the data. ${usedLength}hr lessons, no brief/debrief buffer yet. Searched ${usedFrom} to ${usedTo}${usedSolo?" — solo flight, instructor checks skipped (none needed)":""}. <span style="color:var(--amber)">"Not confirmed" rows mean no availability data was found either way</span> — genuinely unknown, not assumed fine. <span style="color:var(--red)">Rows marked "⚠ conflict" share an aircraft or instructor with another suggestion at an overlapping time</span> — both are shown since only one can actually happen, so it's your call which one.</div>`;
+    el.innerHTML=banner+`<table><thead><tr><th>Student</th><th>Primary / Secondary Instructor</th><th>Aircraft</th><th>Date</th><th>Window</th><th>Instructor</th><th></th><th></th></tr></thead><tbody>
+      ${matches.map((m,i)=>`<tr style="${m.conflictGroup?'background:rgba(165,18,26,.06)':''}"><td>${m.studentName}</td><td>${m.instructorRequired?`${m.primaryInstructor} / ${m.secondaryInstructor}`:"— (solo)"}</td><td>${m.aircraftReg}</td><td>${m.date}</td><td>${m.start}–${m.end}</td><td style="color:${!m.instructorRequired?'var(--dim)':(m.instructorVerified?'var(--green)':'var(--amber)')}">${!m.instructorRequired?"Not required":(m.instructorVerified?"Confirmed available":"Not confirmed")}</td>
+        <td style="color:var(--red); font-size:11px">${m.conflictGroup?`⚠ conflict (${m.conflictReason})`:""}</td>
         <td><button class="vbtn sched-confirm-btn" style="margin-left:0; padding:4px 10px; font-size:11px" data-idx="${i}" data-mode="real">Confirm</button></td></tr>`).join("")}
     </tbody></table>`;
   }
@@ -1895,6 +1972,41 @@ REAL_STUDENTS.forEach(s=>{
 });
 $("#schedDateFrom").value=new Date().toISOString().slice(0,10);
 $("#schedDateTo").value=new Date(Date.now()+SCHED_SEARCH_DAYS*86400000).toISOString().slice(0,10);
+
+// Pre-sets the day checkboxes from the selected student's own mastersheet
+// availability (round 109) — a starting point, not a lock. Every checkbox
+// stays individually adjustable after this runs; picking a student doesn't
+// disable them, it just saves re-ticking what's already known about that
+// student. "All students" has no single student's days to draw from, so it
+// resets to every day checked — a neutral default, not a guess at anyone's
+// actual availability.
+function presetDayFilterForStudent(){
+  const studentId=$("#schedStudentSelect").value;
+  const checkboxes=[...document.querySelectorAll("#schedDayFilter input[type=checkbox]")];
+  if(studentId==="all"){
+    checkboxes.forEach(cb=>cb.checked=true);
+    $("#schedDayFilterNote").textContent="All days shown — pick a student to pre-fill their own mastersheet availability.";
+    return;
+  }
+  const student=REAL_STUDENTS.find(s=>s.id===studentId);
+  // A student with genuinely no known availability (e.g. Matthew Rogers —
+  // real gap in the mastersheet, not "available zero days ever") must
+  // still preset to all-checked, same as "no student found" — checking
+  // student.availableDays.includes() on an empty array is always false for
+  // every day, which would otherwise silently preset to NOTHING checked,
+  // defeating the entire point of letting them be manually searched.
+  const hasRealDays=student && student.availableDays.length>0;
+  checkboxes.forEach(cb=>{ cb.checked=hasRealDays?student.availableDays.includes(cb.value):true; });
+  $("#schedDayFilterNote").textContent=hasRealDays
+    ?`Pre-set from ${student.name}'s mastersheet availability — adjust freely.`
+    :(student?`${student.name} has no stated availability in the mastersheet — all days shown, pick manually.`:"");
+}
+$("#schedStudentSelect").addEventListener("change",presetDayFilterForStudent);
+presetDayFilterForStudent();
+$("#schedLessonLength").addEventListener("input",()=>{
+  $("#schedLengthLabel").textContent=(+$("#schedLessonLength").value).toFixed(1)+" hr";
+});
+
 $("#schedPreviewBtn").addEventListener("click",()=>{
   const matches=generateSuggestedMatches(SCHED_SAMPLE_STUDENTS,SCHED_SAMPLE_INSTRUCTORS,SCHED_SAMPLE_AIRCRAFT);
   renderSchedResults(matches,"sample");
@@ -1907,6 +2019,8 @@ $("#schedRealBtn").addEventListener("click",async()=>{
   const toDate=$("#schedDateTo").value;
   const studentIdFilter=$("#schedStudentSelect").value;
   const requireInstructor=$("#schedInstructorRequired").value==="true";
+  const dayFilter=[...document.querySelectorAll("#schedDayFilter input[type=checkbox]:checked")].map(cb=>cb.value);
+  const lessonMinutes=Math.round(+$("#schedLessonLength").value*60);
   if(!fromDate||!toDate){
     $("#schedResults").innerHTML=`<div class="hint" style="color:var(--red); padding:var(--u4) 0">Both From and To dates are required.</div>`;
     return;
@@ -1915,11 +2029,15 @@ $("#schedRealBtn").addEventListener("click",async()=>{
     $("#schedResults").innerHTML=`<div class="hint" style="color:var(--red); padding:var(--u4) 0">"To" date can't be before "From" date.</div>`;
     return;
   }
+  if(!dayFilter.length){
+    $("#schedResults").innerHTML=`<div class="hint" style="color:var(--red); padding:var(--u4) 0">At least one day needs to be checked.</div>`;
+    return;
+  }
   btn.textContent=requireInstructor?"Checking live bookings, double-bookings & availability…":"Checking live bookings…";
   btn.disabled=true;
   try{
     const {byReg,byInstructor}=await fetchRealBookings(fromDate,toDate);
-    const matches=await generateRealSuggestions(REAL_STUDENTS,byReg,byInstructor,fromDate,toDate,requireInstructor,studentIdFilter);
+    const matches=await generateRealSuggestions(REAL_STUDENTS,byReg,byInstructor,fromDate,toDate,requireInstructor,studentIdFilter,dayFilter,lessonMinutes);
     renderSchedResults(matches,"real");
     $("#schedClearBtn").style.display="";
   }catch(err){
@@ -1941,7 +2059,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.98.0";
+const VERSION="v0.101.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2581,6 +2699,9 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.101.0",d:"Scheduling: three real changes, all from direct feedback that every suggested slot was 08:00-10:00 regardless of student, day, or aircraft. Root cause was worse than it looked — the matching logic only ever checked a candidate slot against real FlightLogger bookings, never against OTHER suggestions already generated in the same run, so two students needing the same aircraft type on the same day (with nothing real blocking either yet) both independently landed on the exact same first-available slot. Confirmed this with a real example: Zane Walker and Harold Leung, both suggested VH-MNN at 08:00-10:00 on the same date — a genuine double-booking if both had been confirmed. Per instruction, didn't silently auto-resolve this by pushing one later (which an earlier fix attempt had done) — instead built a proper conflict-marking pass: both suggestions still show, sorted next to each other, with a red '⚠ conflict' note explaining why (same aircraft or same instructor — same-instructor wins the label when both apply, since one person genuinely can't be in two places, and this is now deterministic regardless of which pair gets compared first). Also: a day with real open time now offers every slot that fits, not just the earliest (a fully free 08:00-17:00 day with 2hr lessons gives four options, not one) — this is what actually fixed the 'always 08:00' pattern, the conflict-marking was a separate, additional fix for the double-booking risk underneath it. Added a real length slider (0.5-4hrs, half-hour steps, defaults to 2) replacing the fixed constant. Caught and fixed one real bug before shipping: sorting suggestions for display without sorting the same array before storing it would have made the Confirm button act on the wrong row the moment sorting reordered anything — fixed by sorting once, upfront, so what's stored and what's shown always match."},
+  {v:"v0.100.0",d:"Two real fixes to the round-109 day-filter feature, found by re-testing it rather than trusting the previous entry's claim. First: building this same feature landed twice in the same file — a duplicate HTML container and JS function got added on top of the one that already existed, which would have silently broken things (the button handler was reading checkboxes from a different element ID than either duplicate was writing to). Cleaned up, one implementation remains. Second, a genuine bug in the surviving implementation: a student with truly empty mastersheet availability (Matthew Rogers) doesn't get the 'all days checked' default the code intended — checking .includes() on an empty array is always false, so every checkbox came back unchecked instead. This directly contradicts what round 109's own changelog claimed was tested. Fixed properly this time and re-verified: Matthew now correctly presets to all 7 days with a clear note explaining why, and produces real suggestions (61, not the 0 he was permanently stuck on) without needing to manually re-check anything first."},
+  {v:"v0.99.0",d:"Added a day-of-week checkbox filter to Scheduling, pre-set from whichever student's real mastersheet availability is selected — picking Zane Walker pre-checks Sat/Sun, since that's what he actually listed, fully adjustable from there. Two different, deliberate behaviors depending on scope: with 'All students' selected, the day filter narrows the group (intersects with each student's own days — narrowing to Tuesday-only correctly kept exactly the three students who actually listed Tuesday, no one else); with one specific student selected, the filter fully overrides their mastersheet days, since that's deliberate manual control — tested this specifically with Matthew Rogers, whose mastersheet availability is genuinely empty ('awaiting availability from student'), manually checked Wednesday for him, and confirmed real suggestions came back for him on Wednesday, rather than him being permanently stuck with zero results. Unchecking every day is caught with a clear error, same discipline as the date-range validation from last round."},
   {v:"v0.98.0",d:"Scheduling moved before Management Briefing in the nav order. Added a real horizontal filter bar: explicit From/To date pickers (replacing the old 'search window in days' number, same 60-day default but now directly adjustable and validated — 'To' before 'From' is caught with a clear error, not silently misinterpreted) and a Student select populated from the real 6-student list, defaulting to 'All students' but filterable down to exactly one. Rebuilt the date-matching logic around the actual chosen range (datesInRange) rather than a day-count from today, and confirmed the student filter genuinely restricts matching — tested selecting one specific student and verified every returned suggestion belonged to them, not just that the dropdown showed the right value."},
   {v:"v0.97.0",d:"Real instructor double-booking conflicts are now checked, closing a genuine gap flagged by the user: UserAvailability (round 104) only reflects an instructor's general working hours, not whether they're already booked with a different student at that exact time — those are two different things. Added instructorId to the same /bookings-range fetch that already checks aircraft conflicts (a free addition, no extra network call), and merged aircraft + instructor bookings into ONE combined occupied-time calculation rather than two independent checks that could each pass on different sub-windows without actually overlapping each other. Verified precisely: mocked the same instructor already booked with a different student on a completely different aircraft at the exact time of an otherwise-clean suggestion, and confirmed the engine correctly shifted to a later slot on the SAME aircraft, rather than either ignoring the conflict or dropping the aircraft it was still free on. Solo mode re-confirmed still skips every instructor-related check entirely, this one included. Also fixed two real proxy bugs from the v0.95-v0.96 upgrade along the way: a duplicate debug-endpoint declaration that broke deployment outright (caught by wrangler's build step, not by my own testing — node's syntax checker missed it entirely), and a much heavier query (100 nested availability records × 200 users per page) that was almost certainly the real cause of the 502 errors reported since v0.95 — reduced substantially. Switched to actually bundling the proxy with esbuild before shipping it from now on, since plain syntax checking already missed two real problems this round."},
   {v:"v0.96.0",d:"Scheduling: search window and instructor-required are now real, adjustable controls, not fixed constants. Solo mode genuinely skips the instructor-availability fetch entirely (confirmed zero network calls made when selected, not just a UI label change) and correctly bypasses the Sunday rule too, since that's specifically about instructor availability, which doesn't apply when nobody needs to be free. Dual mode re-confirmed still enforces everything from last round with the new adjustable window. Caught and fixed two real, related bugs while wiring this up: fetchRealAircraftBookings was still using a hardcoded 22-day range, which would have silently under-covered aircraft-conflict checking the moment anyone searched further out than that — now spans whatever window is actually selected. And the proxy's own /bookings-range query had the same first:200-with-no-pagination bug /users had before (round 102) — fixed proactively this time, before it could bite the same way, rather than waiting to notice a suspiciously-thin result again."},
