@@ -2098,7 +2098,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.103.0";
+const VERSION="v0.104.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2685,21 +2685,34 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 
 // Changelog — most recent first. Kept terse (one line per version); full
 // detail for any entry lives in the project context transfer doc.
-// Live Data Integrity — placeholder checks for every external/internal source
-// this app will eventually need live access to, to avoid the kind of static-
-// data drift that's already caused real bugs in this project (fleet fuel
-// figures, the old last-light figure). None of these are connected yet —
-// each just runs the same "check → not yet live" animation, staggered so
-// they visibly run one after another rather than all firing at once.
+// Live Data Integrity — round 117: now reflects the truth, not a demo.
+// ERSA, NOTAMs, Airspace, and CASA MOS never had a real data source built —
+// they were shown green for demo purposes only, flagged as a must-fix back
+// in round 95 and left until now. Removed the fake green from all four;
+// they correctly show not-connected, same as everything else that's
+// genuinely not built yet. FlightLogger (Bookings & Student Currency) is
+// the one entry that's now legitimately real — live, tested, and stress-
+// tested bookings/availability/fleet data via the proxy (rounds 101-116) —
+// so it's the first checker to honestly earn green rather than fake it.
+// Aircraft Maintenance Data (FlightLogger) stays not-connected deliberately
+// — the endpoint exists, but MaintenanceBooking reads are blocked by a real
+// permission boundary on every token tried, so there's genuinely no usable
+// data behind it yet, not just an unbuilt feature.
+//
+// `link`, where present, jumps to the relevant page on click — but only to
+// destinations that AREN'T behind the 6-click gate (Solo Signout and its
+// Nav Map subview). Deliberately no link for entries whose relevant page is
+// Scheduling, Maintenance, or YMMB — a prominent, obvious Home-page shortcut
+// to a deliberately-hidden tab would defeat the whole point of gating it.
 const INTEGRITY_CHECKS=[
-  {label:"LTF SOPs & Forms (Google Drive)", warn:"Google Drive API not connected — figures not live, not for operational use."},
-  {label:"FlightLogger (Bookings & Student Currency)", warn:"FlightLogger integration not connected — bookings and student currency data not live."},
+  {label:"LTF SOPs & Forms (Google Drive)", warn:"Google Drive API not connected — figures not live, not for operational use.", link:{view:"signout"}},
+  {label:"FlightLogger (Bookings & Student Currency)", ok:true, warn:"Live via FlightLogger API — bookings and student currency data confirmed real."},
   {label:"Aircraft Maintenance Status", warn:"Google Drive API not connected — MR/unserviceability status not live."},
-  {label:"Aircraft Maintenance Data (FlightLogger)", warn:"FlightLogger integration not connected — maintenance parts/records not live."},
-  {label:"ERSA (Aerodrome Data)", ok:true, warn:"Aerodrome data synced, current AIRAC cycle."},
-  {label:"NOTAMs / Area NOTAMs", ok:true, warn:"NOTAM feed live."},
-  {label:"Airspace Boundaries (CTA/PRD)", ok:true, warn:"Map overlay reflects current CTA/PRD boundaries."},
-  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", ok:true, warn:"Qualifying-flight thresholds synced to current MOS."},
+  {label:"Aircraft Maintenance Data (FlightLogger)", warn:"FlightLogger permission boundary — maintenance parts/records not accessible with the current token."},
+  {label:"ERSA (Aerodrome Data)", warn:"No live aerodrome data source connected — not for operational use.", link:{view:"signout", sub:"navmap"}},
+  {label:"NOTAMs / Area NOTAMs", warn:"NOTAM feed not connected.", link:{view:"signout", sub:"navmap"}},
+  {label:"Airspace Boundaries (CTA/PRD)", warn:"No live airspace data source — map overlay not connected.", link:{view:"signout", sub:"navmap"}},
+  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", warn:"Qualifying-flight thresholds not synced to any live MOS source.", link:{view:"signout", sub:"navmap"}},
   {label:"Live Weather (TAFs / AWIS)", warn:"Live weather integration not connected — current TAFs/AWIS not available."},
   {label:"WhatsApp API"},
 ];
@@ -2707,12 +2720,20 @@ const SPIN_DUR=1.8;
 $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
   const spinDelay=(i*SPIN_DUR).toFixed(2), warnDelay=(i*SPIN_DUR+SPIN_DUR).toFixed(2);
   const prefix=c.ok?"[FETCH SUCCESS]":"[FETCH FAILED]";
-  return `<div class="sopcheck">
+  const clickable=c.link?' style="cursor:pointer" data-int-link="'+i+'"':'';
+  return `<div class="sopcheck"${clickable}>
     <div class="sop-spinner${c.ok?' ok':''}" style="animation-delay:${spinDelay}s"></div>
     <span class="sop-label">${c.label}</span>
     <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s"><span class="sop-prefix">${prefix}</span>${c.warn?` — ${c.warn}`:''}</span>
   </div>`;
 }).join("");
+$("#intGrid").addEventListener("click",e=>{
+  const row=e.target.closest("[data-int-link]"); if(!row) return;
+  const c=INTEGRITY_CHECKS[+row.dataset.intLink];
+  if(!c?.link) return;
+  goView(c.link.view);
+  if(c.link.sub) setTimeout(()=>goSub(c.link.sub),50);
+});
 // Once the full sequence has naturally played through once, lock every
 // checker into its final look via inline styles (highest specificity,
 // overrides the CSS animation outright) rather than leaving it to the
@@ -2738,6 +2759,7 @@ setTimeout(()=>{
 }, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
 
 const CHANGELOG=[
+  {v:"v0.104.0",d:"Live Data Integrity, Home page: now shows the truth, not a demo. ERSA, NOTAMs, Airspace Boundaries, and CASA Part 61 MOS never had a real data source built — they were shown green for demo purposes only, flagged as a must-fix back in round 95 and left until now. All four correctly show not-connected. FlightLogger (Bookings & Student Currency) becomes the first checker to honestly earn green — it's genuinely live and tested now via the proxy (rounds 101-116), not a placeholder. Aircraft Maintenance Data (FlightLogger) stays not-connected deliberately, with an accurate reason — the endpoint exists but MaintenanceBooking reads are blocked by a real permission boundary on every token tried, so there's no usable data behind it yet, not just an unbuilt feature. Every checker with a genuinely relevant page in the app is now clickable — LTF SOPs jumps to Solo Signout; ERSA, NOTAMs, Airspace, and CASA MOS all jump to Solo Signout's Nav Map subview specifically. Deliberately did NOT add links for checkers whose relevant page is Scheduling, Maintenance, or YMMB — those are behind the 6-click gate on purpose, and a prominent, obvious Home-page shortcut straight to them would defeat the point of gating them at all. Verified all three behaviors directly: linked checkers navigate to the right place (including the Nav Map subview specifically activating, not just Solo Signout generally), and non-linked checkers do nothing on click rather than silently failing or navigating somewhere wrong."},
   {v:"v0.103.0",d:"Ran a real, conservative stress test against the proxy (with FlightLogger's own team's go-ahead) and found two genuine bugs, not the result we expected. The test never actually hit FlightLogger's rate limiter as a clean 429 from the app's perspective — it consistently failed at 6-7 requests/second as an opaque 502 instead. Confirmed via wrangler tail that FlightLogger WAS returning a real 429 with a proper rate-limit message the whole time — the proxy's own error handling was flattening every kind of failure (a real, informative rate-limit response included) into the same generic 502, discarding the one piece of information a caller actually needs to back off correctly. Fixed surgically: the proxy now passes through a real 429 with its Retry-After header specifically, while still hiding every other kind of failure behind the generic message, same reasoning as before for anything that isn't a standard, expected signal. Found a second, related bug while verifying the first fix in isolation: even with the real header being set correctly on the wire, cross-origin JavaScript (which is exactly LTF OS's real situation, calling out to a different Workers.dev origin) silently can't read a non-default response header unless the server explicitly opts in via Access-Control-Expose-Headers — which the proxy never did. Confirmed both the bug and the fix directly: an isolated test without the header showed the browser silently returning null for Retry-After despite the server sending '30'; the identical test with the header added correctly returned '30'. Also added clear, specific rate-limit messaging in the app's own fetch error handling, now that the real signal exists to build it from."},
   {v:"v0.102.0",d:"Fixed a real, systemic timezone bug — every 'Not confirmed' instructor-availability result was wrong, not honest. FlightLogger returns availability/booking times in UTC; every date/time comparison in this app was slicing the raw UTC string directly, silently treating UTC clock digits as local time. Confirmed with real data the user pasted: a window stored as 22:00-07:00 UTC is actually 08:00-17:00 LOCAL in Melbourne (UTC+10 in July) — an entirely ordinary working day, unrecognizable to the old code since 22:00 and 08:00 never match no matter what's being compared. Fixed properly in both directions: added real local-time conversion helpers (localDateStr/localTimeStr for reading API responses, localDateTimeToIso for building API requests), and replaced every instance of raw .slice(0,10)/.slice(11,16) across instructor availability, aircraft bookings, and instructor bookings — seven separate spots, not a one-line patch. Verified with the user's own real availability data, browser timezone forced to Australia/Melbourne to match real usage: the exact same real data that showed 'Not confirmed' for everything now correctly shows 'Confirmed available' for every slot on the matching day. Also verified the reverse direction — checked the actual outgoing API request URL and confirmed a requested local day now converts to the correct UTC boundaries, rather than starting 10 hours late and missing the early morning."},
   {v:"v0.101.0",d:"Scheduling: three real changes, all from direct feedback that every suggested slot was 08:00-10:00 regardless of student, day, or aircraft. Root cause was worse than it looked — the matching logic only ever checked a candidate slot against real FlightLogger bookings, never against OTHER suggestions already generated in the same run, so two students needing the same aircraft type on the same day (with nothing real blocking either yet) both independently landed on the exact same first-available slot. Confirmed this with a real example: Zane Walker and Harold Leung, both suggested VH-MNN at 08:00-10:00 on the same date — a genuine double-booking if both had been confirmed. Per instruction, didn't silently auto-resolve this by pushing one later (which an earlier fix attempt had done) — instead built a proper conflict-marking pass: both suggestions still show, sorted next to each other, with a red '⚠ conflict' note explaining why (same aircraft or same instructor — same-instructor wins the label when both apply, since one person genuinely can't be in two places, and this is now deterministic regardless of which pair gets compared first). Also: a day with real open time now offers every slot that fits, not just the earliest (a fully free 08:00-17:00 day with 2hr lessons gives four options, not one) — this is what actually fixed the 'always 08:00' pattern, the conflict-marking was a separate, additional fix for the double-booking risk underneath it. Added a real length slider (0.5-4hrs, half-hour steps, defaults to 2) replacing the fixed constant. Caught and fixed one real bug before shipping: sorting suggestions for display without sorting the same array before storing it would have made the Confirm button act on the wrong row the moment sorting reordered anything — fixed by sorting once, upfront, so what's stored and what's shown always match."},
