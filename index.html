@@ -172,8 +172,27 @@
   @keyframes sopWarnIn{to{opacity:1}}
   .intgrid{display:flex; flex-direction:column}
   .intgrid .sopcheck{padding:var(--u3) 0; border-top:1px solid var(--line2);
-    display:grid; grid-template-columns:14px 300px 1fr; column-gap:var(--u3); align-items:center}
+    display:grid; grid-template-columns:14px 1fr; column-gap:var(--u3); align-items:start}
   .intgrid .sopcheck:first-child{border-top:none}
+  .intgrid .sop-spinner{margin-top:2px}
+  /* Round 121: each checker now shows three separate, deliberately-ordered
+  lines — Information (what the data actually is) → Source (where it comes
+  from and how it's checked) → Application (what it would actually be used
+  for in the app) — instead of one blended sentence mixing all three. Each
+  line starts neutral and is individually colored once its real status is
+  known: green if genuinely confirmed, amber specifically for "the
+  connection/method is real, but nothing is built on top of it yet" (a
+  different situation from red, which means no real connection at all) —
+  so amber and red now carry genuinely different meanings, not just two
+  shades of "not working." */
+  .sop-body{display:flex; flex-direction:column; gap:4px}
+  .sop-line{font-size:11px; line-height:1.45; padding-left:8px;
+    border-left:2px solid rgba(255,255,255,.15); color:var(--dim);
+    transition:border-color .4s ease, color .4s ease}
+  .sop-line b{color:var(--faint); font-weight:600; margin-right:5px}
+  .sop-line.state-green{border-left-color:var(--green); color:var(--fg)}
+  .sop-line.state-amber{border-left-color:var(--amber); color:var(--fg)}
+  .sop-line.state-red{border-left-color:var(--red); color:var(--fg)}
   .sop-prefix{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.3px}
   label.f{display:block; margin-bottom:var(--u3)}
   label.f span{display:block; font-size:12.5px; color:var(--dim); margin-bottom:var(--u2); font-weight:500}
@@ -2115,7 +2134,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.107.0";
+const VERSION="v0.108.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2718,29 +2737,88 @@ $("#linkgrid").innerHTML=QUICK_LINKS.map(c=>`<div class="linkcat">
 // authoritative source for that data instead (opens in a new tab) — used
 // for ERSA/Airspace/CASA MOS, which don't have an in-app page of their own
 // to jump to.
+// Round 121: each entry now separates three distinct things instead of one
+// blended sentence — `info` (what the data actually is), `source` (where
+// it comes from and how the check works), and `application` (what it'd be
+// used for in the app). `connected` is true only when there's a genuine,
+// working method to reach the source (either statically known, or
+// determined live via `liveCheck`). `applied` is a SEPARATE fact — whether
+// something in the app actually uses that data yet. A source can be
+// genuinely connected without being applied (ERSA/Airspace/CASA MOS: the
+// real external site is reachable, but nothing in this app consumes it
+// yet) — that's shown as green/green/amber, not green/green/green or a
+// uniform failure, since "confirmed reachable but unused" is a materially
+// different, better state than "no connection at all."
 const INTEGRITY_CHECKS=[
-  {label:"LTF SOPs & Forms (Google Drive)", warn:"Google Drive API not connected — figures not live, not for operational use.", link:{view:"signout"}},
-  {label:"FlightLogger (Bookings & Student Currency)", warn:"Checking FlightLogger API...", warnOk:"Live via FlightLogger API — bookings and student currency data confirmed real.", warnFail:"FlightLogger API unreachable right now — bookings and student currency data not currently live.", liveCheck:{type:"proxy", path:"/fleet"}},
-  {label:"Aircraft Maintenance Status", warn:"Google Drive API not connected — MR/unserviceability status not live."},
-  {label:"Aircraft Maintenance Data (FlightLogger)", warn:"FlightLogger permission boundary — maintenance parts/records not accessible with the current token."},
-  {label:"ERSA (Aerodrome Data)", warn:"Checking Airservices Australia AIP...", warnOk:"Airservices Australia AIP confirmed reachable — real source available, not yet integrated into this app.", warnFail:"Airservices Australia AIP unreachable right now — not for operational use.", externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10", liveCheck:{type:"reachability", key:"airservices"}},
-  {label:"NOTAMs / Area NOTAMs", warn:"NOTAM feed not connected.", link:{view:"signout", sub:"navmap"}},
-  {label:"Airspace Boundaries (CTA/PRD)", warn:"Checking Airservices Australia AIP...", warnOk:"Airservices Australia AIP confirmed reachable — real source available, map overlay not yet integrated.", warnFail:"Airservices Australia AIP unreachable right now — map overlay not connected.", externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10", liveCheck:{type:"reachability", key:"airservices"}},
-  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)", warn:"Checking CASA regulatory framework...", warnOk:"CASA regulatory framework page confirmed reachable — real source available, not yet synced into qualifying-flight thresholds.", warnFail:"CASA regulatory framework page unreachable right now.", externalLink:"https://www.casa.gov.au/rules/regulatory-framework", liveCheck:{type:"reachability", key:"casa"}},
-  {label:"Live Weather (TAFs / AWIS)", warn:"Live weather integration not connected — current TAFs/AWIS not available."},
-  {label:"WhatsApp API"},
+  {label:"LTF SOPs & Forms (Google Drive)",
+    info:"Company Procedures, forms, and reference documents used across solo sign-off checks.",
+    source:"Google Drive API — not connected, no live method built yet.",
+    application:"Would feed Solo Signout's compliance references directly.",
+    connected:false, applied:false, link:{view:"signout"}},
+  {label:"FlightLogger (Bookings & Student Currency)",
+    info:"Real bookings, student currency, and aircraft/instructor scheduling data.",
+    source:"FlightLogger GraphQL API — checked live via the proxy's /fleet endpoint.",
+    sourceFail:"FlightLogger GraphQL API — unreachable right now via the proxy's /fleet endpoint.",
+    application:"Powers the Scheduling module's real conflict checking and suggestions.",
+    applied:true, liveCheck:{type:"proxy", path:"/fleet"}},
+  {label:"Aircraft Maintenance Status",
+    info:"Aircraft unserviceability and MR (maintenance release) status.",
+    source:"Google Drive API — not connected, no live method built yet.",
+    application:"Would flag grounded or restricted aircraft before booking or solo sign-off.",
+    connected:false, applied:false},
+  {label:"Aircraft Maintenance Data (FlightLogger)",
+    info:"Maintenance parts, records, and scheduled maintenance windows.",
+    source:"FlightLogger API — endpoint built, but blocked by a real permission boundary on the current token.",
+    application:"Would feed the Maintenance page's live parts and records view.",
+    connected:false, applied:false},
+  {label:"ERSA (Aerodrome Data)",
+    info:"Current aerodrome data — runway, frequency, and procedure information.",
+    source:"Airservices Australia AIP — checked live for reachability via the proxy.",
+    sourceFail:"Airservices Australia AIP — unreachable right now.",
+    application:"Would feed Nav Map's aerodrome reference — not yet integrated.",
+    applied:false, externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10", liveCheck:{type:"reachability", key:"airservices"}},
+  {label:"NOTAMs / Area NOTAMs",
+    info:"Active NOTAMs and area-specific flight notices.",
+    source:"No NOTAM feed connected — no live method built yet.",
+    application:"Would flag active NOTAMs relevant to planned routes.",
+    connected:false, applied:false, link:{view:"signout", sub:"navmap"}},
+  {label:"Airspace Boundaries (CTA/PRD)",
+    info:"Current CTA/PRD airspace boundary data.",
+    source:"Airservices Australia AIP — checked live for reachability via the proxy.",
+    sourceFail:"Airservices Australia AIP — unreachable right now.",
+    application:"Would overlay real airspace boundaries on Nav Map — not yet integrated.",
+    applied:false, externalLink:"https://www.airservicesaustralia.com/aip/aip.asp?pg=10", liveCheck:{type:"reachability", key:"airservices"}},
+  {label:"CASA Part 61 MOS (Qualifying Nav Thresholds)",
+    info:"Qualifying cross-country flight thresholds under Part 61 MOS.",
+    source:"CASA regulatory framework — checked live for reachability via the proxy.",
+    sourceFail:"CASA regulatory framework — unreachable right now.",
+    application:"Would sync qualifying-flight thresholds automatically — not yet integrated.",
+    applied:false, externalLink:"https://www.casa.gov.au/rules/regulatory-framework", liveCheck:{type:"reachability", key:"casa"}},
+  {label:"Live Weather (TAFs / AWIS)",
+    info:"Current TAFs and AWIS weather observations.",
+    source:"No live weather integration connected — no live method built yet.",
+    application:"Would inform go/no-go weather checks on the Morning Brief.",
+    connected:false, applied:false},
+  {label:"WhatsApp API",
+    info:"Informal maintenance squawks and group-chat mentions.",
+    source:"No WhatsApp API connection — no live method built yet.",
+    application:"Would surface informal squawks against the relevant aircraft.",
+    connected:false, applied:false},
 ];
 const SPIN_DUR=1.8;
 $("#intGrid").innerHTML=INTEGRITY_CHECKS.map((c,i)=>{
-  const spinDelay=(i*SPIN_DUR).toFixed(2), warnDelay=(i*SPIN_DUR+SPIN_DUR).toFixed(2);
-  const prefix=c.ok?"[FETCH SUCCESS]":"[FETCH FAILED]";
+  const spinDelay=(i*SPIN_DUR).toFixed(2);
   const hasLink=c.link||c.externalLink;
   const title=c.externalLink?' title="Open the real authoritative source"':(c.link?' title="Go to this in the app"':'');
   const clickable=hasLink?` style="cursor:pointer"${title} data-int-link="${i}"`:'';
   return `<div class="sopcheck"${clickable}>
-    <div class="sop-spinner${c.ok?' ok':''}" style="animation-delay:${spinDelay}s"></div>
-    <span class="sop-label">${c.label}</span>
-    <span class="sop-warning${c.ok?' ok':''}" style="animation-delay:${warnDelay}s"><span class="sop-prefix">${prefix}</span>${c.warn?` — ${c.warn}`:''}</span>
+    <div class="sop-spinner" style="animation-delay:${spinDelay}s"></div>
+    <div class="sop-body">
+      <span class="sop-label">${c.label}</span>
+      <div class="sop-line sop-info"><b>Information</b>${c.info}</div>
+      <div class="sop-line sop-source"><b>Source</b>${c.source}</div>
+      <div class="sop-line sop-application"><b>Application</b>${c.application}</div>
+    </div>
   </div>`;
 }).join("");
 $("#intGrid").addEventListener("click",e=>{
@@ -2752,73 +2830,90 @@ $("#intGrid").addEventListener("click",e=>{
   if(c.link.sub) setTimeout(()=>goSub(c.link.sub),50);
 });
 
-// Real live checks (round 119) — these three entries only ever show green
-// once actually confirmed, not on a static flag. FlightLogger is checked by
-// calling the proxy's own /fleet endpoint for real. ERSA/Airspace/CASA MOS
-// don't have any app-side integration to check, so instead confirm the
-// real external source is genuinely reachable right now, via the proxy's
-// new /reachability endpoints — a browser can't get an honest answer to
-// this itself (a cross-origin fetch to a site that hasn't opted into CORS
-// gets blocked before any real status is visible, which would misreport as
-// "down" even when the site is fine), so this has to go through something
-// that can make the request server-side. Runs in parallel with the spin-in
-// animation, not blocking it — updates both the underlying data (so the
-// existing lock-in logic below picks up the correct final state) and the
-// visible DOM immediately, so the result doesn't just sit correct-but-
-// invisible until the whole sequence finishes.
+// Round 121 — reveals each checker's three lines in sequence (Information,
+// then Source, then Application, ~280ms apart) once its real state is
+// known, rather than all three appearing at once. The colour itself
+// carries real meaning, not just pass/fail: red means no genuine
+// connection at all; amber means the connection/method is confirmed real,
+// but nothing in the app actually uses it yet; green means both the
+// connection AND a real application exist. Information and Source always
+// share the same colour (both hinge on whether the source genuinely
+// connects) — only Application can differ, landing on amber specifically
+// when the hard part (reaching the source) works but nothing's built on
+// top of it, a materially better state than a flat failure and worth
+// showing as one.
+function revealCheckerState(row,connected,applied){
+  const lines=row.querySelectorAll(".sop-line");
+  const infoSourceState=connected?"green":"red";
+  const applicationState=!connected?"red":(applied?"green":"amber");
+  const states=[infoSourceState,infoSourceState,applicationState];
+  states.forEach((s,i)=>{
+    setTimeout(()=>{ lines[i].classList.add("state-"+s); },i*280);
+  });
+  const spinner=row.querySelector(".sop-spinner");
+  const overall=!connected?"red":(applied?"green":"amber");
+  setTimeout(()=>{
+    spinner.style.animation="none";
+    spinner.style.transform="none";
+    if(overall==="green") spinner.style.borderColor="var(--green)";
+    else{ spinner.style.borderColor="rgba(255,255,255,.15)"; spinner.style.borderTopColor=`var(--${overall})`; }
+  },states.length*280);
+}
+
+// FlightLogger is checked by actually calling the proxy's own /fleet
+// endpoint. ERSA/Airspace/CASA MOS don't have any app-side integration to
+// check, so instead confirm the real external source is genuinely
+// reachable right now, via the proxy's /reachability endpoints — a
+// browser can't get an honest answer to this itself (a cross-origin fetch
+// to a site that hasn't opted into CORS gets blocked before any real
+// status is visible, which would misreport as "down" even when the site
+// is fine), so this has to go through something that can make the request
+// server-side.
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
 async function runLiveIntegrityCheck(c,i){
-  if(!c.liveCheck) return;
-  let ok=false;
-  try{
-    if(c.liveCheck.type==="proxy"){
-      const res=await fetch(`${FLIGHTLOGGER_PROXY}${c.liveCheck.path}`);
-      ok=res.ok;
-    }else if(c.liveCheck.type==="reachability"){
-      const res=await fetch(`${FLIGHTLOGGER_PROXY}/reachability/${c.liveCheck.key}`);
-      const data=await res.json();
-      ok=!!(res.ok && data.reachable);
-    }
-  }catch(err){
-    ok=false; // network failure, CORS, proxy unreachable, etc. — honestly not confirmed
-  }
-  c.ok=ok;
   const row=document.querySelectorAll("#intGrid .sopcheck")[i];
   if(!row) return;
-  const spinner=row.querySelector(".sop-spinner");
-  const warnEl=row.querySelector(".sop-warning");
-  spinner.classList.toggle("ok",ok);
-  warnEl.classList.toggle("ok",ok);
-  const prefix=ok?"[FETCH SUCCESS]":"[FETCH FAILED]";
-  const rest=ok?c.warnOk:c.warnFail;
-  warnEl.innerHTML=`<span class="sop-prefix">${prefix}</span>${rest?` — ${rest}`:''}`;
+  // Matches when this row's own spin-in animation naturally completes —
+  // #app.on starts the spinners running at 2.5s (the splash's own reveal
+  // delay), each row staggered by its own animation-delay on top of that.
+  // Without this, a static (non-live-check) row would reveal its final
+  // state instantly at script-start, well before the splash even
+  // finishes — right back into the same "appears too early/inconsistent"
+  // problem the round-120 fix addressed for the plane.
+  const minRevealDelay=2500+(i+1)*SPIN_DUR*1000;
+  if(!c.liveCheck){
+    await delay(minRevealDelay);
+    revealCheckerState(row,c.connected,c.applied);
+    return;
+  }
+  const checkPromise=(async()=>{
+    let connected=false;
+    try{
+      if(c.liveCheck.type==="proxy"){
+        const res=await fetch(`${FLIGHTLOGGER_PROXY}${c.liveCheck.path}`);
+        connected=res.ok;
+      }else if(c.liveCheck.type==="reachability"){
+        const res=await fetch(`${FLIGHTLOGGER_PROXY}/reachability/${c.liveCheck.key}`);
+        const data=await res.json();
+        connected=!!(res.ok && data.reachable);
+      }
+    }catch(err){
+      connected=false; // network failure, CORS, proxy unreachable, etc. — honestly not confirmed
+    }
+    return connected;
+  })();
+  // Waits for whichever takes longer — the real check, or this row's own
+  // natural staggered timing — rather than ever revealing early.
+  const [connected]=await Promise.all([checkPromise,delay(minRevealDelay)]);
+  c.connected=connected;
+  const sourceEl=row.querySelector(".sop-source");
+  if(!connected && c.sourceFail) sourceEl.innerHTML=`<b>Source</b>${c.sourceFail}`;
+  revealCheckerState(row,connected,c.applied);
 }
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
-// Once the full sequence has naturally played through once, lock every
-// checker into its final look via inline styles (highest specificity,
-// overrides the CSS animation outright) rather than leaving it to the
-// animation classes. CSS animations restart from the beginning whenever an
-// element goes from display:none back to displayed — since Home does
-// exactly that every time you navigate away and back, without this the
-// whole spin-in sequence would replay on every single return visit. This
-// runs once, after the splash's own reveal delay (2.5s) plus the time the
-// slowest (last-staggered) checker needs to finish, with a small buffer for
-// its final fade-in transition.
-setTimeout(()=>{
-  document.querySelectorAll("#intGrid .sop-spinner").forEach((el,i)=>{
-    const c=INTEGRITY_CHECKS[i];
-    el.style.animation="none";
-    el.style.transform="none";
-    if(c.ok) el.style.borderColor="var(--green)";
-    else{ el.style.borderColor="rgba(255,255,255,.15)"; el.style.borderTopColor="var(--amber)"; }
-  });
-  document.querySelectorAll("#intGrid .sop-warning").forEach(el=>{
-    el.style.animation="none";
-    el.style.opacity="1";
-  });
-}, 2500+INTEGRITY_CHECKS.length*SPIN_DUR*1000+400);
-
 const CHANGELOG=[
+  {v:"v0.108.0",d:"Live Data Integrity checkers restructured: each now shows three separate, clearly labeled lines — Information (what the data actually is), Source (where it comes from and how the check works), and Application (what it would actually be used for in the app) — instead of one blended sentence mixing all three together. Colour now carries a real, three-way meaning rather than plain pass/fail: red means no genuine connection at all; amber means the connection/method is confirmed real but nothing in the app uses it yet; green means both the connection and a real application exist. ERSA, Airspace Boundaries, and CASA Part 61 MOS land on green/green/amber specifically — their real external sources are genuinely confirmed reachable, but nothing consumes that data yet, which is a materially better state than a flat failure and now reads as one. FlightLogger is the one entry that's fully green across all three. Each checker's three lines reveal in sequence (Information, then Source, then Application, ~280ms apart) once its real state is known, rather than all three appearing at once. Fixed a real timing bug before shipping: an early version revealed static (non-live-checked) entries instantly at script start, well before the splash sequence even finishes — same class of problem as the round-120 plane fix. Every entry's reveal now waits for its own natural staggered position in the splash sequence, and live-checked entries additionally wait for their real network check, whichever takes longer. Verified directly: nothing is coloured during the splash window, the cascade genuinely staggers one line at a time rather than jumping straight to the final state, a failed reachability check correctly swaps the Source line's text to the honest failure message, and the final state survives navigating away from and back to Home without re-triggering."},
   {v:"v0.107.0",d:"Fixed the splash screen plane sometimes taking a moment to appear. The plane's fly-in animation was an unconditional CSS rule on #plane itself, meaning its .15s delay started counting from whenever the browser happened to first paint that specific rule — not a fixed point in time, and for a large single-file app that parse-to-first-paint time isn't perfectly constant, so the plane could visibly lag on some loads. Gated the animation behind a JS-toggled class instead, triggered as the very first statement the script executes (before any of the app's own data or logic runs) — a specific, deterministic point rather than implicit paint timing. Verified directly: the class is present immediately on load, and the opacity timeline through the fly-in/fly-out sequence matches the intended timing exactly (invisible early, fully visible mid-sequence, faded back out by the end)."},
   {v:"v0.106.0",d:"Live Data Integrity: FlightLogger, ERSA, Airspace Boundaries, and CASA Part 61 MOS now only show green on a real, live confirmation — not a static flag. FlightLogger is checked by actually calling the proxy's /fleet endpoint. ERSA/Airspace/CASA MOS are checked by confirming their real external sources (Airservices Australia's AIP, CASA's regulatory framework) are genuinely reachable right now, via two new proxy endpoints (/reachability/casa, /reachability/airservices) — a browser can't get an honest answer to this itself, since a cross-origin check against a site that hasn't opted into CORS gets blocked before any real status is visible, which would misreport as 'down' even when the site is fine; doing the check server-side avoids that entirely. Deliberately built as two specific, hardcoded endpoints rather than one general 'check any URL' endpoint, since an open URL-fetcher would let the proxy be used to probe arbitrary third-party sites. Removed the now-served-its-purpose round-116 debug introspection endpoint at the same time. Verified all the real scenarios directly, not just the happy path: mixed success/failure (FlightLogger and CASA reachable, Airservices Australia unreachable) correctly showed green/red per entry, not uniformly; a complete proxy outage correctly showed every live-checked entry as failed with honest text, not a false green or an unhandled error; and the eventual locked-in final state (after the full spin-in sequence completes) correctly reflects whichever real result came back, confirmed by checking the actual frozen border color, not just the class name."},
   {v:"v0.105.0",d:"Live Data Integrity: ERSA, Airspace Boundaries (CTA/PRD), and CASA Part 61 MOS now link out to their real authoritative sources on click — Airservices Australia's AIP for ERSA/Airspace, CASA's regulatory framework page for Part 61 MOS — opening in a new tab rather than navigating within the app, since these are real external destinations. NOTAMs keeps its existing in-app Nav Map link, unaffected."},
