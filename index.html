@@ -298,6 +298,12 @@
   .mr-trial-submit{grid-column:1 / -1; background:var(--mr-red); color:#fff; border:none; border-radius:2px; padding:var(--u2) var(--u4); font-weight:700; font-size:12px; cursor:pointer; justify-self:start}
   .mr-trial-submit:hover{background:var(--mr-red-dim)}
   .mr-trial-submit:disabled{opacity:.5; cursor:not-allowed}
+  .mr-inline-btn{background:none; border:1px solid var(--mr-red-dim); color:var(--mr-red); border-radius:2px;
+    padding:2px 8px; font-size:10.5px; font-weight:600; cursor:pointer; margin-top:4px}
+  .mr-inline-btn:hover{background:rgba(165,18,26,.06)}
+  .mr-inline-btn:disabled{opacity:.5; cursor:not-allowed}
+  .mr-inline-btn-danger{border-color:var(--mr-red); color:var(--mr-red); margin-left:4px}
+  .mr-inline-btn-danger:hover{background:var(--mr-red); color:#fff}
   .maplegend{position:absolute; top:56px; right:var(--u6); font-size:10.5px; color:var(--dim);
     background:rgba(18,22,31,.92); padding:var(--u2) var(--u3); border-radius:var(--r1); line-height:1.8; border:1px solid var(--line)}
   .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle} /* point-scale exception */
@@ -818,6 +824,8 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
             </table>
           </div>
         </div>
+
+        <div id="maintMrPart2Static"></div>
 
         <div class="mr-block">
           <div class="mr-part-label">Part 3 — Daily Inspection Certifications and Aircraft Time-in-Service</div>
@@ -2103,7 +2111,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.110.0";
+const VERSION="v0.112.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2322,20 +2330,45 @@ let flFleetData={}; // callSign -> live summary, populated once /fleet succeeds
 let flFleetLoaded=false;
 let flDetailCache={}; // callSign -> live detail, cached per session once fetched
 
+// Round 124 — a single shared FlightLogger connectivity check. Previously
+// the Maintenance page's own indicator and the Home page's Live Data
+// Integrity checker each made their OWN separate call to /fleet — the
+// exact same endpoint, checked twice, independently. Even with no bug at
+// all, two independent network calls can genuinely land on different
+// results just from ordinary timing (one succeeds, the other hits a
+// transient blip) — precisely the "should never show different results"
+// case. Now there's exactly one real check; every place that needs to
+// know "is FlightLogger actually reachable right now" awaits this same
+// promise, so they can't structurally disagree.
+let flConnectivityPromise=null;
+function checkFlightLoggerConnectivity(){
+  if(!flConnectivityPromise){
+    flConnectivityPromise=(async()=>{
+      try{
+        const res=await fetch(`${FLIGHTLOGGER_PROXY}/fleet`);
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const fleet=await res.json();
+        return {connected:true, fleet};
+      }catch(err){
+        return {connected:false, error:err.message};
+      }
+    })();
+  }
+  return flConnectivityPromise;
+}
+
 async function connectFlightLogger(){
   const warn=$("#flCheckWarning"), row=$("#flCheckRow"), spinner=row.querySelector(".sop-spinner");
-  try{
-    const res=await fetch(`${FLIGHTLOGGER_PROXY}/fleet`);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const fleet=await res.json();
+  const result=await checkFlightLoggerConnectivity();
+  if(result.connected){
     flFleetData={};
-    fleet.forEach(a=>{ flFleetData[a.callSign]=a; });
+    result.fleet.forEach(a=>{ flFleetData[a.callSign]=a; });
     flFleetLoaded=true;
     spinner.classList.add("ok");
     warn.classList.add("ok");
-    warn.innerHTML=`<span class="sop-prefix">[LIVE]</span> — connected to FlightLogger — ${fleet.length} aircraft synced.`;
-  }catch(err){
-    console.error("FlightLogger fleet fetch failed:",err);
+    warn.innerHTML=`<span class="sop-prefix">[LIVE]</span> — connected to FlightLogger — ${result.fleet.length} aircraft synced.`;
+  }else{
+    console.error("FlightLogger fleet fetch failed:",result.error);
     warn.innerHTML=`<span class="sop-prefix">[FETCH FAILED]</span> — could not reach the FlightLogger proxy — showing static/demo status only.`;
   }
   renderMaintTiles();
@@ -2426,29 +2459,43 @@ function renderLiveWarningBand(elId, warning){
 // same as grounded (e.g. an item can be past its nominal point but still
 // inside its stated ± tolerance).
 // Round 122 — trial Maintenance Release Part 2 (Technical Log) entries,
-// real and persistent via the proxy's new /mr/:reg endpoints (backed by a
+// real and persistent via the proxy's /mr/:reg endpoints (backed by a
 // dedicated KV namespace, MR_DATA — separate from the scheduling cache,
 // since these entries need to survive indefinitely, not expire). Genuinely
 // per-aircraft: works for any registration in the real fleet, not just
 // VH-KAI's existing static example. Deliberately scoped to just this —
 // Part 1's other fields (MR number, expiry, issued-by, etc.) and Part 3
-// (daily inspection/TIS log) are untouched, per explicit instruction that
-// Part 3 is a separate, later piece of work. Aircraft type and
-// registration shown here are the real, synced fleet data, not
-// re-entered — "hours in service" isn't confirmed available from the
-// current FlightLogger query (only totalLandings is), so it stays out of
-// this section entirely rather than fake a sync that doesn't exist.
+// (daily inspection/TIS log) are untouched. Aircraft type and registration
+// shown here are the real, synced fleet data, not re-entered — "hours in
+// service" isn't confirmed available from the current FlightLogger query
+// (only totalLandings is), so it stays out of this section entirely
+// rather than fake a sync that doesn't exist.
+//
+// Round 125 — redesigned per direct instruction to match how a real
+// Maintenance Release Part 2 actually works: an endorsement (the defect)
+// and its clearing endorsement (the rectification) are genuinely separate
+// events, often logged by different people with different licences/ARNs,
+// at different times. Only defect + reportedBy are required to create an
+// entry; rectification + rectifiedBy can be added later via "Add
+// rectification," by someone else entirely. Every entry can also be
+// edited or deleted outright. Rendered into the one fixed
+// #maintMrPart2Static container (positioned between the static Part 1 and
+// Part 3 blocks in the actual page markup) rather than a per-registration
+// slot inside the tile-click detail panel — that's what actually fixes
+// the ordering; the previous approach physically put Part 2 above Part 1
+// on the page regardless of what the container itself was named.
+let mrEditingId=null; // id of the entry currently being edited/rectified, or null
 async function renderMrPart2Trial(container,reg,type){
+  mrEditingId=null;
   container.innerHTML=`<div class="mr-block">
     <div class="mr-part-label">Part 2 — Technical Log (Trial)</div>
-    <div class="hint" style="margin-bottom:var(--u3)">Real, persistent trial entries for ${reg} (${type}) — stored independently of this app's own version, survives every future update. Not yet an operational record; for trialling the data entry itself. Part 1 (MR number, expiry, issued-by, etc.) and Part 3 (daily inspection/time-in-service log) are separate, later pieces of work — this covers defect, rectification, and sign-off only.</div>
+    <div class="hint" style="margin-bottom:var(--u3)">Real, persistent trial entries for ${reg} (${type}) — stored independently of this app's own version, survives every future update. Not yet an operational record; for trialling the data entry itself. A defect can be logged with just the defect and who reported it — the rectification doesn't need to be written at the same time, and can be added later by someone else with a different licence/ARN, matching how a real endorsement and its clearing endorsement actually work. Part 1 (MR number, expiry, issued-by, etc.) and Part 3 (daily inspection/time-in-service log) are separate, later pieces of work.</div>
     <div id="mrTrialTableWrap-${reg}"><div class="hint">Loading existing entries…</div></div>
     <div class="mr-trial-form" id="mrTrialForm-${reg}">
       <div class="f wide"><label>Defect</label><textarea data-field="defect" placeholder="What was found"></textarea></div>
-      <div class="f wide"><label>Rectification</label><textarea data-field="rectification" placeholder="What was done to fix it"></textarea></div>
-      <div class="f"><label>Signed off by</label><input type="text" data-field="signedOffBy" placeholder="Name / licence"></div>
+      <div class="f"><label>Reported by</label><input type="text" data-field="reportedBy" placeholder="Name / licence"></div>
       <div class="f"><label>Date</label><input type="date" data-field="date" value="${new Date().toISOString().slice(0,10)}"></div>
-      <button class="mr-trial-submit" data-reg="${reg}">Add entry</button>
+      <button class="mr-trial-submit" data-reg="${reg}">Add defect</button>
     </div>
   </div>`;
   await loadMrPart2Trial(reg);
@@ -2460,50 +2507,159 @@ async function loadMrPart2Trial(reg){
     const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}`);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const entries=await res.json();
-    if(!entries.length){
-      wrap.innerHTML=`<div class="hint">No trial entries yet for ${reg}.</div>`;
-      return;
-    }
-    wrap.innerHTML=`<div style="overflow-x:auto"><table class="mr-table"><thead><tr>
-      <th>Date</th><th>Defect</th><th>Rectification</th><th>Signed off by</th>
-    </tr></thead><tbody>
-      ${entries.slice().reverse().map(e=>`<tr><td>${e.date}</td><td>${e.defect}</td><td>${e.rectification}</td><td>${e.signedOffBy}</td></tr>`).join("")}
-    </tbody></table></div>`;
+    renderMrTrialTable(wrap,reg,entries);
   }catch(err){
     wrap.innerHTML=`<div class="hint" style="color:var(--mr-red)">Couldn't load existing entries (${err.message}) — the KV store may not be bound yet on the proxy side.</div>`;
   }
 }
-document.body.addEventListener("click",async e=>{
-  const btn=e.target.closest(".mr-trial-submit"); if(!btn) return;
-  const reg=btn.dataset.reg;
-  const form=$(`#mrTrialForm-${reg}`);
-  const defect=form.querySelector('[data-field="defect"]').value.trim();
-  const rectification=form.querySelector('[data-field="rectification"]').value.trim();
-  const signedOffBy=form.querySelector('[data-field="signedOffBy"]').value.trim();
-  const date=form.querySelector('[data-field="date"]').value;
-  if(!defect||!rectification||!signedOffBy){
-    alert("Defect, rectification, and signed off by are all required.");
+function renderMrTrialTable(wrap,reg,entries){
+  if(!entries.length){
+    wrap.innerHTML=`<div class="hint">No trial entries yet for ${reg}.</div>`;
     return;
   }
-  btn.disabled=true; btn.textContent="Adding…";
-  try{
-    const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({defect,rectification,signedOffBy,date}),
-    });
-    if(!res.ok){
-      const body=await res.json().catch(()=>({}));
-      throw new Error(body.error||`HTTP ${res.status}`);
+  const rows=entries.slice().reverse().map(e=>{
+    if(e.id===mrEditingId) return renderMrEditRow(reg,e);
+    const rectCell=e.rectification
+      ? `${e.rectification}<div class="hint" style="margin-top:2px">by ${e.rectifiedBy}${e.rectifiedAt?` — ${e.rectifiedAt.slice(0,10)}`:''}</div>`
+      : `<span class="hint">Not yet rectified</span><br><button class="mr-inline-btn" data-action="rectify" data-id="${e.id}" data-reg="${reg}">Add rectification</button>`;
+    return `<tr data-entry-id="${e.id}">
+      <td>${e.date}</td>
+      <td>${e.defect}<div class="hint" style="margin-top:2px">reported by ${e.reportedBy}</div></td>
+      <td>${rectCell}</td>
+      <td>
+        <button class="mr-inline-btn" data-action="edit" data-id="${e.id}" data-reg="${reg}">Edit</button>
+        <button class="mr-inline-btn mr-inline-btn-danger" data-action="delete" data-id="${e.id}" data-reg="${reg}">Delete</button>
+      </td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML=`<div style="overflow-x:auto"><table class="mr-table"><thead><tr>
+    <th>Date</th><th>Defect</th><th>Rectification</th><th></th>
+  </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function renderMrEditRow(reg,e){
+  return `<tr data-entry-id="${e.id}">
+    <td colspan="4">
+      <div class="mr-trial-form" style="margin-top:0">
+        <div class="f wide"><label>Defect</label><textarea data-field="defect">${e.defect}</textarea></div>
+        <div class="f"><label>Reported by</label><input type="text" data-field="reportedBy" value="${e.reportedBy}"></div>
+        <div class="f"><label>Date</label><input type="date" data-field="date" value="${e.date}"></div>
+        <div class="f wide"><label>Rectification</label><textarea data-field="rectification" placeholder="What was done to fix it">${e.rectification||''}</textarea></div>
+        <div class="f"><label>Rectified by</label><input type="text" data-field="rectifiedBy" placeholder="Name / licence — can differ from who reported it" value="${e.rectifiedBy||''}"></div>
+        <div class="f" style="display:flex; align-items:end; gap:var(--u2)">
+          <button class="mr-trial-submit" data-action="save" data-id="${e.id}" data-reg="${reg}" style="margin:0">Save</button>
+          <button class="mr-inline-btn" data-action="cancel-edit" style="margin:0">Cancel</button>
+        </div>
+      </div>
+    </td>
+  </tr>`;
+}
+document.body.addEventListener("click",async e=>{
+  // New entry (defect only)
+  const addBtn=e.target.closest(".mr-trial-submit[data-reg]:not([data-action])");
+  if(addBtn){
+    const reg=addBtn.dataset.reg;
+    const form=$(`#mrTrialForm-${reg}`);
+    const defect=form.querySelector('[data-field="defect"]').value.trim();
+    const reportedBy=form.querySelector('[data-field="reportedBy"]').value.trim();
+    const date=form.querySelector('[data-field="date"]').value;
+    if(!defect||!reportedBy){
+      alert("Defect and reported by are both required — rectification can be added later.");
+      return;
     }
-    form.querySelector('[data-field="defect"]').value="";
-    form.querySelector('[data-field="rectification"]').value="";
-    form.querySelector('[data-field="signedOffBy"]').value="";
-    await loadMrPart2Trial(reg);
-  }catch(err){
-    alert(`Couldn't save this entry: ${err.message}`);
-  }finally{
-    btn.disabled=false; btn.textContent="Add entry";
+    addBtn.disabled=true; addBtn.textContent="Adding…";
+    try{
+      const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({defect,reportedBy,date}),
+      });
+      if(!res.ok){
+        const body=await res.json().catch(()=>({}));
+        throw new Error(body.error||`HTTP ${res.status}`);
+      }
+      form.querySelector('[data-field="defect"]').value="";
+      form.querySelector('[data-field="reportedBy"]').value="";
+      await loadMrPart2Trial(reg);
+    }catch(err){
+      alert(`Couldn't save this entry: ${err.message}`);
+    }finally{
+      addBtn.disabled=false; addBtn.textContent="Add defect";
+    }
+    return;
+  }
+
+  // Enter edit mode (also used for "Add rectification" — same form, just
+  // an existing entry with an empty rectification to begin with)
+  const editBtn=e.target.closest('[data-action="edit"], [data-action="rectify"]');
+  if(editBtn){
+    mrEditingId=editBtn.dataset.id;
+    await loadMrPart2Trial(editBtn.dataset.reg);
+    return;
+  }
+
+  const cancelBtn=e.target.closest('[data-action="cancel-edit"]');
+  if(cancelBtn){
+    mrEditingId=null;
+    // Re-derive reg from the visible table wrap's id rather than assume —
+    // simplest reliable source given this button has no data-reg itself.
+    const wrap=cancelBtn.closest('[id^="mrTrialTableWrap-"]');
+    if(wrap) await loadMrPart2Trial(wrap.id.replace("mrTrialTableWrap-",""));
+    return;
+  }
+
+  const saveBtn=e.target.closest('[data-action="save"]');
+  if(saveBtn){
+    const id=saveBtn.dataset.id, reg=saveBtn.dataset.reg;
+    const row=saveBtn.closest("tr");
+    const defect=row.querySelector('[data-field="defect"]').value.trim();
+    const reportedBy=row.querySelector('[data-field="reportedBy"]').value.trim();
+    const date=row.querySelector('[data-field="date"]').value;
+    const rectification=row.querySelector('[data-field="rectification"]').value.trim();
+    const rectifiedBy=row.querySelector('[data-field="rectifiedBy"]').value.trim();
+    if(!defect||!reportedBy){
+      alert("Defect and reported by are both required.");
+      return;
+    }
+    if(rectification && !rectifiedBy){
+      alert("A rectification needs someone recorded as having rectified it.");
+      return;
+    }
+    saveBtn.disabled=true; saveBtn.textContent="Saving…";
+    try{
+      const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}/${encodeURIComponent(id)}`,{
+        method:"PATCH",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({defect,reportedBy,date,rectification:rectification||null,rectifiedBy:rectifiedBy||null}),
+      });
+      if(!res.ok){
+        const body=await res.json().catch(()=>({}));
+        throw new Error(body.error||`HTTP ${res.status}`);
+      }
+      mrEditingId=null;
+      await loadMrPart2Trial(reg);
+    }catch(err){
+      alert(`Couldn't save this entry: ${err.message}`);
+      saveBtn.disabled=false; saveBtn.textContent="Save";
+    }
+    return;
+  }
+
+  const deleteBtn=e.target.closest('[data-action="delete"]');
+  if(deleteBtn){
+    const id=deleteBtn.dataset.id, reg=deleteBtn.dataset.reg;
+    if(!confirm("Delete this entry? This can't be undone.")) return;
+    deleteBtn.disabled=true; deleteBtn.textContent="Deleting…";
+    try{
+      const res=await fetch(`${FLIGHTLOGGER_PROXY}/mr/${encodeURIComponent(reg)}/${encodeURIComponent(id)}`,{method:"DELETE"});
+      if(!res.ok){
+        const body=await res.json().catch(()=>({}));
+        throw new Error(body.error||`HTTP ${res.status}`);
+      }
+      await loadMrPart2Trial(reg);
+    }catch(err){
+      alert(`Couldn't delete this entry: ${err.message}`);
+      deleteBtn.disabled=false; deleteBtn.textContent="Delete";
+    }
   }
 });
 
@@ -2543,7 +2699,7 @@ function renderMrPart1FromLive(parts){
 
 async function showLiveOnlyDetail(reg){
   const panel=$("#maintDetail");
-  panel.querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintMrTrialWrap-${reg}"></div>`;
+  panel.querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div>`;
   $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="margin:0">Loading live FlightLogger data…</div>`;
   $("#maintSubtabs").style.display="none"; // no discrepancies/documents/booking data for these yet
   try{
@@ -2562,7 +2718,7 @@ async function showLiveOnlyDetail(reg){
       <div class="hint" style="margin-top:var(--u2)">Total landings ${detail.totalLandings??'—'} · Total fuel ${detail.totalFuel??'—'} <span style="color:var(--sky)">[LIVE]</span></div>`;
     renderLiveWarningBand("#maintGaugePanel", detail.worstMaintenanceWarning);
     $("#maintGaugePanel").innerHTML+=`<div class="hint" style="margin-top:var(--u3)">This aircraft's detailed maintenance-parts records aren't available yet — the connected FlightLogger account can see warnings but not full parts history for aircraft outside VH-KAI. See VH-KAI for the full parts table (static snapshot).</div>`;
-    renderMrPart2Trial($(`#maintMrTrialWrap-${reg}`),detail.callSign,detail.model);
+    renderMrPart2Trial($("#maintMrPart2Static"),detail.callSign,detail.model);
   }catch(err){
     console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
     $("#maintAcHeader").innerHTML=`<div style="font-size:20px; font-weight:800; color:var(--ink)">${reg}</div><div class="hint" style="color:var(--amber)">Live detail fetch failed — try again shortly.</div>`;
@@ -2580,7 +2736,7 @@ $("#maintTiles").addEventListener("click",e=>{
     // VH-KAI: restore the full rich static panel (header/gauge/parts tables/
     // subtabs) exactly as before, then layer live warning data on top in its
     // own clearly-marked band underneath the gauge.
-    $("#maintDetail").querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintLiveBand" style="margin-top:var(--u3)"></div><div id="maintMrTrialWrap-${reg}" style="margin-top:var(--u3)"></div>`;
+    $("#maintDetail").querySelector(".panel").innerHTML=`<div id="maintAcHeader"></div><div id="maintGaugePanel" style="margin-top:var(--u4)"></div><div id="maintLiveBand" style="margin-top:var(--u3)"></div>`;
     $("#maintSubtabs").style.display="";
     renderMaintAcHeader();
     renderMaintGauge();
@@ -2596,7 +2752,7 @@ $("#maintTiles").addEventListener("click",e=>{
         }
         renderLiveWarningBand("#maintLiveBand", detail.worstMaintenanceWarning);
         renderMrPart1FromLive(detail.maintenanceParts);
-        renderMrPart2Trial($(`#maintMrTrialWrap-${reg}`),detail.callSign,detail.model);
+        renderMrPart2Trial($("#maintMrPart2Static"),detail.callSign,detail.model);
       }catch(err){
         console.error(`FlightLogger detail fetch failed for ${reg}:`,err);
         $("#maintLiveBand").innerHTML=`<div class="hint" style="color:var(--amber)">Live warning fetch failed — showing static data only above.</div>`;
@@ -2813,17 +2969,18 @@ const INTEGRITY_CHECKS=[
     source:"FlightLogger GraphQL API — checked live via the proxy's /fleet endpoint.",
     sourceFail:"FlightLogger GraphQL API — unreachable right now via the proxy's /fleet endpoint.",
     application:"Powers the Scheduling module's real conflict checking and suggestions.",
-    applied:true, liveCheck:{type:"proxy", path:"/fleet"}},
+    applied:true, liveCheck:{type:"shared-fleet"}},
   {label:"Aircraft Maintenance Status",
     info:"Aircraft unserviceability and MR (maintenance release) status.",
     source:"Google Drive API — not connected, no live method built yet.",
     application:"Would flag grounded or restricted aircraft before booking or solo sign-off.",
     connected:false, applied:false},
   {label:"Aircraft Maintenance Data (FlightLogger)",
-    info:"Maintenance parts, records, and scheduled maintenance windows.",
-    source:"FlightLogger API — endpoint built, but blocked by a real permission boundary on the current token.",
-    application:"Would feed the Maintenance page's live parts and records view.",
-    connected:false, applied:false},
+    info:"Aircraft-level maintenance warnings, landings, and fleet status.",
+    source:"FlightLogger GraphQL API — checked live via the proxy's /fleet endpoint (the same real connection used everywhere else in the app).",
+    sourceFail:"FlightLogger GraphQL API — unreachable right now via the proxy's /fleet endpoint.",
+    application:"Detailed maintenance parts/records aren't accessible yet — blocked by a real permission boundary on the current token — so this data isn't fully integrated into the Maintenance page yet, even though the underlying connection is genuinely real.",
+    applied:false, liveCheck:{type:"shared-fleet"}},
   {label:"ERSA (Aerodrome Data)",
     info:"Current aerodrome data — runway, frequency, and procedure information.",
     source:"Airservices Australia AIP — checked live for reachability via the proxy.",
@@ -2942,7 +3099,10 @@ async function runLiveIntegrityCheck(c,i){
   const checkPromise=(async()=>{
     let connected=false;
     try{
-      if(c.liveCheck.type==="proxy"){
+      if(c.liveCheck.type==="shared-fleet"){
+        const result=await checkFlightLoggerConnectivity();
+        connected=result.connected;
+      }else if(c.liveCheck.type==="proxy"){
         const res=await fetch(`${FLIGHTLOGGER_PROXY}${c.liveCheck.path}`);
         connected=res.ok;
       }else if(c.liveCheck.type==="reachability"){
@@ -2966,6 +3126,8 @@ async function runLiveIntegrityCheck(c,i){
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
 const CHANGELOG=[
+  {v:"v0.112.0",d:"Three real changes to the trial Maintenance Release Part 2 system. First, fixed the display order — Part 2 now genuinely sits between Part 1 and Part 3 in the page, always, for every aircraft. It previously lived in a completely different part of the page (the tile-click detail panel, above Part 1 entirely) because its container happened to be positioned there, not because of any deliberate ordering logic — moved it into a fixed container physically placed between the two static blocks, which is what actually fixes it, not just relabeling. Second, defect and rectification are now genuinely separate steps, matching how a real Maintenance Release Part 2 actually works — an endorsement and its clearing endorsement are recorded separately, often by different people with different licences. A defect can now be logged with just the defect and who reported it; the rectification and who rectified it can be added later, by someone else entirely, via a real 'Add rectification' action. Third, every entry can now be edited or deleted outright — real PATCH/DELETE endpoints on the proxy, not just create-and-forget. Verified all of it directly: the Part 1→2→3 order for both the generic and VH-KAI-specific views, a defect-only entry correctly showing 'Not yet rectified' until a real rectification is added by a different named person, editing changing the stored text and removing the old value, and deleting genuinely removing the entry rather than just hiding it."},
+  {v:"v0.111.0",d:"Fixed a real consistency risk between the Home page's Live Data Integrity and the Maintenance page's own connection indicator — they were each making their own separate call to the exact same /fleet endpoint, meaning they could genuinely show different results from ordinary network timing alone, no bug required. Replaced both with a single shared connectivity check that every place reads from, so they can no longer structurally disagree — confirmed directly by counting actual network calls (exactly one /fleet request now, not two, across both pages together) rather than just checking the displayed text matched. Also corrected 'Aircraft Maintenance Data (FlightLogger),' per direct instruction: the underlying FlightLogger connection is genuinely real (the same one used everywhere else in the app), it's specifically the detailed parts/records sub-feature that's blocked by a permission boundary — now shows green/green/amber (connected, not fully integrated), the same honest pattern already used for ERSA/Airspace/CASA MOS, rather than a flat red implying nothing works at all. Verified both the success and failure cases stay consistent across both pages, not just the happy path."},
   {v:"v0.110.0",d:"Removed the static VH-XPP Maintenance Release example entirely — the specific example values in Part 1's header fields (MR number, expiry, issued-by, etc.) and the whole static Part 2 'Endorsements' table (now redundant with the real, per-aircraft trial system from last round) are gone. The layout, paper-form styling, and table structure stay exactly as they were — kept deliberately as the visual/structural reference for how this data should look, per instruction — just with no misleading example values sitting in it regardless of which aircraft is actually selected. Part 1's maintenance-requirements table is now genuinely empty until real live data populates it (still works correctly for VH-KAI, confirmed after the change). Part 3 (daily inspection/time-in-service log) is untouched — it was already an empty structural template with no specific example values, so nothing about it was actually 'the XPP sheet' in the first place."},
   {v:"v0.109.0",d:"Real, persistent trial Maintenance Release Part 2 (Technical Log) data entry — defect, rectification, and signed-off-by, per aircraft, for every aircraft in the fleet, not just VH-KAI's existing static example. Storage genuinely lives independently of this app's own version: two new proxy endpoints (GET/POST /mr/:reg) backed by a dedicated Cloudflare KV namespace (MR_DATA, separate from the scheduling cache, since these entries need to persist indefinitely rather than expire) — the data survives every future rebuild of the HTML file itself, and multiple people can add entries for the same aircraft without overwriting each other's work. Aircraft type and registration shown are the real, synced fleet data, not re-entered; 'hours in service' stays out of this entirely, since it isn't confirmed available from the current FlightLogger query (only totalLandings is) — not faking a sync that doesn't exist. Deliberately scoped to Part 2 only, per explicit instruction: Part 1's other fields (MR number, expiry, issued-by, etc.) and Part 3 (daily inspection/time-in-service log) are separate, later work, untouched here. Worth noting directly: the existing static Part 1/2/3 example (VH-XPP) was already shown regardless of which aircraft tile is selected before this round, and still is — that's pre-existing behavior, out of scope for this change, not something introduced or fixed here."},
   {v:"v0.108.0",d:"Live Data Integrity checkers restructured: each now shows three separate, clearly labeled lines — Information (what the data actually is), Source (where it comes from and how the check works), and Application (what it would actually be used for in the app) — instead of one blended sentence mixing all three together. Colour now carries a real, three-way meaning rather than plain pass/fail: red means no genuine connection at all; amber means the connection/method is confirmed real but nothing in the app uses it yet; green means both the connection and a real application exist. ERSA, Airspace Boundaries, and CASA Part 61 MOS land on green/green/amber specifically — their real external sources are genuinely confirmed reachable, but nothing consumes that data yet, which is a materially better state than a flat failure and now reads as one. FlightLogger is the one entry that's fully green across all three. Each checker's three lines reveal in sequence (Information, then Source, then Application, ~280ms apart) once its real state is known, rather than all three appearing at once. Fixed a real timing bug before shipping: an early version revealed static (non-live-checked) entries instantly at script start, well before the splash sequence even finishes — same class of problem as the round-120 plane fix. Every entry's reveal now waits for its own natural staggered position in the splash sequence, and live-checked entries additionally wait for their real network check, whichever takes longer. Verified directly: nothing is coloured during the splash window, the cascade genuinely staggers one line at a time rather than jumping straight to the final state, a failed reachability check correctly swaps the Source line's text to the honest failure message, and the final state survives navigating away from and back to Home without re-triggering."},
