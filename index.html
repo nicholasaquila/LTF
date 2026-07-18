@@ -1427,7 +1427,15 @@ const AIRCRAFT_TYPES={
       {id:"bagFront", label:"Baggage (Front)",   arm:2508,default:0,limit:35}, // round 96, matches this station's existing arm exactly
       {id:"bagRear",  label:"Baggage (Rear)",    arm:2896,default:0,limit:25}, // round 96, matches this station's existing arm exactly
     ],
-    fuel:{arm:1511,kgPerL:null},
+    // kgPerL:0.72 set per direct user decision (round 134), not sourced from
+    // the Sling 2's own POH or the LTF SOP — neither states a fuel density
+    // for this type. Both this app's actual Sling 2 POH extract and the
+    // separate SOP reference file only confirm the fuel TYPE (100/100LL
+    // avgas), same as the C172, which already uses 0.72 kg/L in this app
+    // for that same fuel. User confirmed applying the same figure here
+    // rather than leaving it unset, given the shared fuel type — flagged
+    // here plainly as a deliberate decision, not a POH-sourced constant.
+    fuel:{arm:1511,kgPerL:0.72},
     categories:{
       normal:{
         mtow:700, // POH §6.4, stated directly in kg
@@ -1650,12 +1658,18 @@ const FLEET=[
   // since the user provided it directly as real fleet data, same treatment
   // as VH-FPV's similar discrepancy in round 89 — worth confirming this
   // one against the current live fleet, not necessarily an error.
-  {reg:"VH-CCI",type:"SLG2",bew:386.3,arm:1697,maxFuelL:null},
-  {reg:"VH-LLF",type:"SLG2",bew:409.3,arm:1685,maxFuelL:null},
-  {reg:"VH-PPY",type:"SLG2",bew:392.9,arm:1676,maxFuelL:null},
-  {reg:"VH-UUD",type:"SLG2",bew:384.0,arm:1658,maxFuelL:null},
-  {reg:"VH-UUQ",type:"SLG2",bew:397.0,arm:1682,maxFuelL:null},
-  {reg:"VH-FFZ",type:"SLG2",bew:392.8,arm:1672,maxFuelL:null},
+  // maxFuelL:146 for all 6 tails below — real, sourced figure (LTF SOP v4.0
+  // Jan 2022, ltf-aircraft-sop-data.js: "Main Tanks... 150 litres Total /
+  // 146 litres Usable"), applied uniformly across every Sling 2 tail since
+  // no tail-specific override has been given for any of them — same
+  // treatment as the DA40's 188L standard-tank figure, which likewise
+  // applies to every tail without its own confirmed override.
+  {reg:"VH-CCI",type:"SLG2",bew:386.3,arm:1697,maxFuelL:146},
+  {reg:"VH-LLF",type:"SLG2",bew:409.3,arm:1685,maxFuelL:146},
+  {reg:"VH-PPY",type:"SLG2",bew:392.9,arm:1676,maxFuelL:146},
+  {reg:"VH-UUD",type:"SLG2",bew:384.0,arm:1658,maxFuelL:146},
+  {reg:"VH-UUQ",type:"SLG2",bew:397.0,arm:1682,maxFuelL:146},
+  {reg:"VH-FFZ",type:"SLG2",bew:392.8,arm:1672,maxFuelL:146},
   // PA44 and DA42 — real registrations confirmed against the live
   // FlightLogger fleet pull (round 94). No per-tail bew/arm given in the
   // SOP source (it's a fleet-wide weight-limits summary, not individual
@@ -2218,7 +2232,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.120.0";
+const VERSION="v0.121.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -3555,6 +3569,7 @@ async function runLiveIntegrityCheck(c,i){
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
 const CHANGELOG=[
+  {v:"v0.121.0",d:"Sling 2's W&B calculator is now fully usable across all 6 real tails — it was silently blocked entirely (showing 'NO DATA YET', including the CG envelope graph, which was otherwise already correct and sourced) by two separate missing pieces of data, found while answering a direct question about the envelope. Fuel density (kgPerL) is now 0.72 kg/L, set per direct user decision — not from the Sling 2's own POH or the LTF SOP, since neither states a density for this type, but matching the same figure already used for the C172, which runs on the same 100/100LL avgas. Per-tail usable fuel capacity (maxFuelL, previously null on every one of the 6 tails) is now 146L, applied uniformly across all of them — a real, sourced figure this time (LTF SOP v4.0: 'Main Tanks... 150 litres Total / 146 litres Usable'), same treatment as the DA40's 188L standard-tank figure which likewise applies fleet-wide without a tail-specific override. Verified all 6 Sling 2 tails individually: each now shows a real 'WITHIN LIMITS' verdict, the envelope graph genuinely renders (previously an empty SVG), and the fuel-weight math checks out exactly against the new density (120L × 0.72 = 86.4kg, matching what's displayed)."},
   {v:"v0.120.0",d:"Fuel Plan's power-setting/burn-rate picker is now real for every aircraft type in the fleet, not just the DA40. Pulled directly from LTF's own SOP data (ltf-aircraft-sop-data.js) — C172R (65%/75% power), C172S (three real cruise points: 42%/61%/77%, each with its real airspeed kept in the label), Sling 2 (4800/5000 RPM — labeled as RPM, not power percentage, since that's genuinely what the source gives for this type), PA44 (65%/75% power, using the source's own directly-given USG/hr figures rather than converting), and DA42 (65%/75% power). Figures given in L/hr in the source were converted to this app's existing USG/hr convention for consistency, so the same Fuel Plan math works unchanged regardless of which unit the original SOP entry happened to use. The Decathlon stays exactly as it was — genuinely no fuelFlow data exists for it anywhere in the source, so its picker honestly shows 'No power-setting data yet' rather than a fabricated figure. Verified every type's dropdown directly against hand-calculated conversions (all six matched exactly), and confirmed the full Trip Fuel conversion chain now works end-to-end for a previously-unpowered type (C172S: 60 min at its default 42% slow-cruise rate correctly computes to exactly 24.0L)."},
   {v:"v0.119.0",d:"Fuel Plan's Taxi and Final Reserve now autofill from real, sourced SOP figures for whichever aircraft is selected, and Trip Fuel defaults to 60 minutes. Pulled directly from LTF's own SOP data (ltf-aircraft-sop-data.js, previously a reference file not yet wired into the app) — Taxi is a real fixed-litres figure per type (confirmed for DA40, C172R, C172S, Sling 2, PA44, and DA42; genuinely absent from the source for the Decathlon, which stays manual rather than guessed). Final Reserve's 30-minute day-VFR figure is a universal regulatory default (Exposition 2.2.1(4a), same citation already on this row) and always autofills; its litres conversion only autofills where the SOP gives a real, dedicated holding-rate figure for that type (confirmed for C172S, PA44, DA42) — DA40, C172R, Sling 2, and the Decathlon only have cruise-power settings in the source, no dedicated holding phase, so their reserve litres stays manual rather than assumed from an unrelated cruise figure. Trip Fuel's 60-minute default converts to litres via the existing burn-rate mechanism once a power setting is available, same as manually typing 60 always has. All three reset to the newly-selected aircraft's own real defaults on every aircraft change, same precedent already established for Endurance. Verified the exact figure for all seven aircraft types individually (not just spot-checked one), confirmed the litres math for every type with a real holding rate lines up exactly (12.0L for C172S, 35.5L for PA44, 15.0L for DA42 — all 30/60 × the sourced rate), and confirmed switching between aircraft correctly resets every field to the new type's own real numbers rather than carrying over the previous selection's values."},
   {v:"v0.118.0",d:"Fixed the WAC/VNC/VTC chart toggle per direct feedback — two real problems, not one. First, these are now genuinely independent filters: any combination can be active at once (a shared CSS class, not mutually exclusive), each with its own colour. Second, each active chart type now draws a real, visible dashed outline directly on the map itself, nested by colour when multiple are active — not just descriptive text with nothing to actually look at. Found and fixed a real bug while verifying this: the map-drawing function (drawMap()) fully replaces the map SVG's content every time it runs — on initial load and on every route switch — which was silently wiping out the outline the instant it was drawn. Fixed by redrawing the active outlines at the end of drawMap() itself, not just once at page load, so they now correctly survive switching between routes. Verified directly: the default outline appears on load (it hadn't been), multiple outlines nest correctly when several filters are active simultaneously, all currently-active outlines survive a route change, and the info panel lists every active chart type together rather than just one."},
