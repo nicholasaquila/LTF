@@ -331,6 +331,17 @@
   .maint-tile:hover{border-color:var(--sky)}
   .maint-tile.active-tile{border-color:var(--sky); box-shadow:0 0 0 1px var(--sky)}
   .maint-tile.disabled-tile{opacity:.35; cursor:not-allowed; pointer-events:none}
+  .fleet-view-btn{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); color:var(--dim);
+    padding:var(--u2) var(--u4); font-size:12.5px; font-weight:600; cursor:pointer}
+  .fleet-view-btn.active{background:var(--sky); border-color:var(--sky); color:#fff}
+  .apron-zone{background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3); margin-bottom:var(--u3)}
+  .apron-zone-label{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--faint); margin-bottom:var(--u2)}
+  .apron-spots{display:flex; gap:var(--u2); flex-wrap:wrap}
+  .apron-spot{background:var(--bg2); border:1px solid var(--line); border-radius:var(--r1); padding:var(--u2) var(--u3); min-width:110px}
+  .apron-spot.reserved{border-style:dashed; opacity:.7}
+  .apron-spot .spotlabel{font-size:9.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.04em}
+  .apron-spot .spotreg{font-size:13px; font-weight:800; color:var(--ink); margin-top:2px}
+  .apron-spot .spotnote{font-size:10px; color:var(--dim); margin-top:2px; line-height:1.35}
   .maint-tile .reg{font-weight:800; font-size:14px; color:var(--ink)}
   .maint-tile .type{font-size:10.5px; color:var(--faint); margin-top:2px}
   .wa-mention{margin-top:var(--u3); padding:var(--u3); border-left:2px solid var(--sky);
@@ -710,6 +721,12 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <div class="subview" id="sub-navmap" data-sub="navmap">
         <div class="subhead">Nav Map</div>
         <p class="sub" style="margin-top:0">LTF standard solo routes · reference overlay</p>
+        <div style="display:flex; gap:var(--u2); margin-bottom:var(--u3); flex-wrap:wrap">
+          <button class="fleet-view-btn chart-toggle-btn active" data-chart="wac">WAC</button>
+          <button class="fleet-view-btn chart-toggle-btn" data-chart="vnc">VNC</button>
+          <button class="fleet-view-btn chart-toggle-btn" data-chart="vtc">VTC</button>
+        </div>
+        <div id="chartInfo" class="hint" style="margin-bottom:var(--u3)"></div>
         <div class="maplayout">
           <div class="navmenu">
             <input class="search" id="navSearch" placeholder="Filter routes…">
@@ -764,7 +781,12 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       </div>
 
       <div class="plabel" style="margin-top:var(--u4)">Aircraft Fleet Status</div>
+      <div style="display:flex; gap:var(--u2); margin-bottom:var(--u3)">
+        <button class="fleet-view-btn active" data-fleetview="tiles">Tile View</button>
+        <button class="fleet-view-btn" data-fleetview="apron">Apron View (WIP)</button>
+      </div>
       <div class="mainttiles" id="maintTiles"></div>
+      <div id="maintApron" style="display:none"></div>
 
       <div id="maintDetail" style="display:none; margin-top:var(--u5)">
         <div class="panel">
@@ -1110,6 +1132,15 @@ const AIRCRAFT_TYPES={
       {pct:55,label:"55% Best Power",burnUSGH:8.5,default:true},
       {pct:75,label:"75% Best Power",burnUSGH:11},
     ],
+    // Taxi fuel and a fuel-plan holding rate — LTF SOP v4.0 Jan 2022,
+    // "Start/Taxi/Take-off" and fuelFlow phase table (ltf-aircraft-sop-data.js).
+    // Taxi is a real, sourced fixed figure (2 USG). Holding is genuinely NOT
+    // given for the DA40 in this SOP — only 55%/75% Best Power cruise
+    // settings exist, no dedicated holding-rate entry — so holdingLPerHr is
+    // left undefined here rather than assumed from a cruise setting; the
+    // Fuel Plan's Final Reserve litres field stays manual for this type
+    // until a real holding figure is confirmed.
+    taxiL:7.6, // 2 USG × 3.78541
   },
   // American Champion 8KCAB Super Decathlon — real POH/W&B data from
   // SuperDecathlonW_B.xlsx (round 88), both sheets ("8KCAB" per-tail data,
@@ -1146,6 +1177,11 @@ const AIRCRAFT_TYPES={
     },
     // Not given anywhere in the source — genuinely missing, not overlooked.
     powerSettings:[],
+    // No entry for the 8KCAB/Super Decathlon exists anywhere in
+    // ltf-aircraft-sop-data.js at all — genuinely missing from the source,
+    // not overlooked. taxiL/holdingLPerHr are deliberately left undefined;
+    // the Fuel Plan's Taxi and Final Reserve litres fields stay manual for
+    // this type until real figures are confirmed.
   },
   // Cessna 172 — station/fuel arm data originally from
   // C172_Weight_and_Balance.xlsx (round 88); MTOW, baggage limits, and
@@ -1249,6 +1285,11 @@ const AIRCRAFT_TYPES={
       },
     },
     powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js):
+    // "Start/Taxi/Take-off" (5L, fixed) and "Holding" (24 L/hr) — both
+    // explicitly given for this type, unlike several others in the fleet.
+    taxiL:5,
+    holdingLPerHr:24,
   },
   C172R:{
     name:"Cessna 172R",
@@ -1308,6 +1349,13 @@ const AIRCRAFT_TYPES={
       },
     },
     powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
+    // "Start/Taxi/Take-off" (2 USG). No dedicated Holding phase is given
+    // for this type — only 75%/65% power cruise settings — so
+    // holdingLPerHr is deliberately left undefined rather than assumed
+    // from a cruise figure; Final Reserve litres stays manual for this
+    // type until a real holding rate is confirmed.
+    taxiL:7.6, // 2 USG × 3.78541
   },
   // Sling 2 (SLG2) — round 93. IMPORTANT CORRECTION: earlier rounds in this
   // project (66, 72) referred to this type as "SLG2 glider" in code
@@ -1395,6 +1443,12 @@ const AIRCRAFT_TYPES={
       },
     },
     powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
+    // "Start/Taxi/Take-off" (2L, fixed). No dedicated Holding phase given —
+    // only "4800 RPM" and "5000 RPM" cruise settings — so holdingLPerHr is
+    // deliberately left undefined; Final Reserve litres stays manual for
+    // this type until a real holding rate is confirmed.
+    taxiL:2,
   },
   // Piper PA44 Seminole — round 94. Source: LTF's own "Aircraft Standard
   // Operating Procedures (SOP's)" v4.0, January 2022, §1.3.9 (a real CASA-
@@ -1427,6 +1481,12 @@ const AIRCRAFT_TYPES={
       },
     },
     powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
+    // "Taxi (flight planning)" (10L, explicitly labeled for planning
+    // purposes) and "Holding 55% (20in MAP / 2300 RPM)" (71 L/hr) — both
+    // confirmed available for this type.
+    taxiL:10,
+    holdingLPerHr:71,
   },
   // Diamond DA42 — round 94, same source (LTF SOP v4.0, §1.3.8). Same
   // situation as PA44: real weight/baggage limits, no station arm or CG
@@ -1454,6 +1514,11 @@ const AIRCRAFT_TYPES={
       },
     },
     powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
+    // "Taxi" (5L, fixed) and "Holding (55% power)" (30 L/hr) — both
+    // confirmed available for this type.
+    taxiL:5,
+    holdingLPerHr:30,
   },
 };
 
@@ -2115,7 +2180,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.113.0";
+const VERSION="v0.119.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2329,6 +2394,73 @@ function tilePlanformSVG(mode, color){
 // tables below stay as the last-synced static snapshot until that's granted;
 // everything else wired up here (fleet-wide status, worstMaintenanceWarning,
 // nextService) is genuinely live.
+// Round 130 — WAC/VNC/VTC chart-type toggle, coverage information only —
+// deliberately NOT an attempt to render actual chart imagery or live
+// data, which this app doesn't have and shouldn't fabricate. Sourced
+// directly to CASA's own VFRG chart descriptions. Moorabbin's real VNC
+// edition ("Melbourne/Deniliquin") is stated with confidence since it was
+// directly confirmed; WAC/VTC edition names for this specific area aren't
+// asserted here, since that wasn't confirmed with the same certainty —
+// better to say so than guess at a specific edition name.
+//
+// Round 131 — corrected per direct feedback: these are now genuinely
+// independent filters (any combination can be active at once, not a
+// single either/or choice), and each active one draws a real, visible
+// outline directly on the map SVG itself — not just descriptive text
+// with nothing to actually look at. Each chart type gets its own colour
+// and its own inset, so multiple active outlines nest visibly rather
+// than overlapping into one indistinguishable line. This is still a
+// coverage/reference indicator, not a geographically precise chart
+// boundary — these charts genuinely cover a far larger real area than
+// this local route map shows, so the outline marks "this chart type
+// applies here," not an actual to-scale edge.
+const CHART_INFO={
+  wac:{title:"WAC — World Aeronautical Chart",color:"var(--orange)",
+    body:"Scale 1:1,000,000. Designed for pre-flight planning and pilotage — the broadest of the three. Constructed on Lambert's Conformal Conic Projection; Australian coverage is shown on the front of each physical chart.",
+    note:"Reference only — the specific WAC edition covering YMMB isn't confirmed here; check the current edition directly."},
+  vnc:{title:"VNC — Visual Navigation Chart",color:"var(--sky)",
+    body:"Scale 1:500,000. Designed for VFR operations — an aeronautical overlay of controlled airspace over a topographical base, with some radio and navigation data. Used for the transition from WAC to VTC around terminal areas, and for navigating near controlled, restricted, or danger airspace.",
+    note:"Moorabbin (YMMB) falls under VNC – Melbourne/Deniliquin."},
+  vtc:{title:"VTC — Visual Terminal Chart",color:"var(--green)",
+    body:"Scale 1:250,000. Designed for visual operations near terminal areas, intended for use up to and including FL180 — the most detailed of the three, with topographical detail plus airspace, radio, and navaid information.",
+    note:"Reference only — the specific VTC edition covering YMMB isn't confirmed here; check the current edition directly."},
+};
+function updateChartOverlay(){
+  const mapEl=$("#map");
+  mapEl.querySelectorAll(".chart-outline").forEach(el=>el.remove());
+  const active=[...document.querySelectorAll(".chart-toggle-btn.active")].map(b=>b.dataset.chart);
+  active.forEach((key,i)=>{
+    const c=CHART_INFO[key];
+    const inset=6+i*10;
+    const rect=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("class","chart-outline");
+    rect.setAttribute("x",inset); rect.setAttribute("y",inset);
+    rect.setAttribute("width",640-inset*2); rect.setAttribute("height",520-inset*2);
+    rect.setAttribute("fill","none");
+    // getComputedStyle needed since SVG presentation attributes can't
+    // resolve CSS custom properties directly the way inline style props can.
+    rect.setAttribute("stroke",getComputedStyle(document.body).getPropertyValue(c.color.slice(4,-1)).trim());
+    rect.setAttribute("stroke-width","2.5");
+    rect.setAttribute("stroke-dasharray","8,5");
+    rect.setAttribute("opacity",".85");
+    mapEl.appendChild(rect);
+  });
+  $("#chartInfo").innerHTML=active.length
+    ? active.map(key=>{
+        const c=CHART_INFO[key];
+        return `<div style="margin-bottom:6px"><span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${c.color}; margin-right:5px; vertical-align:middle"></span><b>${c.title}</b> — ${c.body} <span style="color:var(--amber)">${c.note}</span></div>`;
+      }).join("")
+    : `<div>No chart filters active — click WAC, VNC, or VTC to show that chart's coverage outline on the map.</div>`;
+}
+document.querySelectorAll(".chart-toggle-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    btn.classList.toggle("active");
+    updateChartOverlay();
+  });
+});
+document.querySelector('.chart-toggle-btn[data-chart="wac"]')?.classList.add("active");
+updateChartOverlay();
+
 const FLIGHTLOGGER_PROXY="https://ltfos-flightlogger-proxy.ltfos.workers.dev";
 let flFleetData={}; // callSign -> live summary, populated once /fleet succeeds
 let flFleetLoaded=false;
@@ -2378,6 +2510,27 @@ async function connectFlightLogger(){
   renderMaintTiles();
 }
 
+// Round 127 — default fleet-tile sort order, by type: Diamond DA40 first,
+// then Cessnas (172R/172S), then Sling 2, then Diamond DA42, then Piper
+// PA44, then the Super Decathlon last. Deliberately checked against each
+// type's own real name string (not the FLEET array's internal order,
+// which stays untouched — that order still matters elsewhere, e.g. the
+// W&B aircraft selector) so this sort applies specifically to the
+// Maintenance page's tile grid without disturbing anything else that
+// reads from FLEET. Matches by substring rather than exact string, since
+// VH-KAI's type is "DA40 IFR [LRT]" — a real, different string from the
+// rest of the DA40 fleet's "Diamond DA40" — but should still sort into
+// the same DA40 group, not fall through to "unknown, sort last."
+function mrFleetTypeSortPriority(type){
+  const t=(type||"").toLowerCase();
+  if(t.includes("da40")) return 0;
+  if(t.includes("cessna")||t.includes("172")) return 1;
+  if(t.includes("sling")) return 2;
+  if(t.includes("da42")) return 3;
+  if(t.includes("pa44")||t.includes("seminole")) return 4;
+  if(t.includes("decathlon")||t.includes("8kcab")) return 5;
+  return 6; // anything unrecognised sorts last, not silently first
+}
 function buildMaintTileList(){
   // Always start from the known baseline (VH-KAI + the W&B fleet) so the
   // grid isn't empty while loading or if the live fetch fails — then add
@@ -2392,11 +2545,183 @@ function buildMaintTileList(){
     .filter(reg=>reg.startsWith("VH-")&&!seen.has(reg))
     .sort()
     .map(reg=>({reg,type:flFleetData[reg].model}));
-  return [...MAINT_KNOWN_AIRCRAFT,...extra];
+  const combined=[...MAINT_KNOWN_AIRCRAFT,...extra];
+  combined.sort((a,b)=>{
+    const pa=mrFleetTypeSortPriority(a.type), pb=mrFleetTypeSortPriority(b.type);
+    if(pa!==pb) return pa-pb;
+    return a.reg.localeCompare(b.reg); // stable secondary order within the same type
+  });
+  return combined;
 }
 
+// Round 128 — Apron View, a real, sourced parking schematic toggled
+// against the tile grid. Built from two real internal emails, not
+// invented: Hannah Burnett's "Parking Sitch" guide (1 Apr 2025) for the
+// flight-line/SLG2/8KCAB/Skydiving-apron/RVAC-grass assignments, and Kai
+// Li's "New Parking Bays" email (3 Feb) for AP009-AP011. Deliberately a
+// built schematic (labelled zones and spots), not a reproduction of the
+// actual aerial photos attached to those emails — those are real
+// photographs, not something to re-embed directly.
+//
+// A few things worth being honest about rather than guessing: the exact
+// spot-by-spot order for "other DA40s" beyond the 5th flight-line spot
+// isn't given in the source email beyond "5th spot onwards, caution of the
+// hangar at the western end in the last few spots" — so those are shown
+// as a group, not assigned to specific numbered spots that were never
+// actually specified. Kai's email doesn't say which specific tails have
+// 3-blade propellers, so AP009-011 are shown as available-for-3-blade-DA40
+// rather than naming particular registrations that weren't confirmed.
+const APRON_LAYOUT={
+  source:"Hannah Burnett, \"Parking Sitch\" email, 1 Apr 2025; Kai Li, \"New Parking Bays\" email, 3 Feb",
+  zones:[
+    {name:"Flight Line",
+      spots:[
+        {label:"1st spot",reg:"VH-FII",type:"DA42",note:"Avoids taxiing over rocks."},
+        {label:"2nd spot",reg:"VH-ROV",type:"DA42",note:"While in maintenance."},
+        {label:"3rd spot / middle taxiway alt.",reg:"VH-MNN / VH-YHH",type:"DA40",note:"Middle taxiway spot (previously VH-UOR's) needs tie-downs removed when flying — can be stored on the back seat."},
+        {label:"4th spot",reg:null,type:"RESERVED",note:"Left available at all times, tie-downs removed, so SLG2 can be moved clear of the rocks before start-up/shutdown."},
+        {label:"5th spot onwards",reg:"Other DA40s",type:"DA40",note:"Caution of the hangar at the western end in the last few spots."},
+      ]},
+    {name:"SLG2 Apron",
+      spots:[{label:"Marked bay",reg:"Sling 2 fleet",type:"SLG2",note:"Moved before start-up/shutdown to avoid the rocks."}]},
+    {name:"8KCAB Bay",
+      spots:[{label:"Marked bay",reg:"Decathlon (8KCAB)",type:"DECATHLON",note:null}]},
+    {name:"Skydiving Apron",
+      spots:[{label:"C172 (3 tails)",reg:"VH-FPV / VH-LXA / VH-ZDV",type:"C172",note:"Tie-downs and cones moved to the grass near the fence when flying or not in the spot."}]},
+    {name:"RVAC Grass Parking",
+      spots:[{label:"C172 (4 tails)",reg:"VH-KOT / VH-LWX / VH-SYH / VH-UOR",type:"C172",note:"Ropes used for tie-downs."}]},
+    {name:"New Bays",
+      spots:[
+        {label:"AP009",reg:null,type:"DA40-3B",note:"For DA40 aircraft with 3-blade propellers."},
+        {label:"AP010",reg:null,type:"DA40-3B",note:"For DA40 aircraft with 3-blade propellers."},
+        {label:"AP011",reg:null,type:"DA40-3B",note:"For DA40 aircraft with 3-blade propellers."},
+      ]},
+  ],
+};
+// Round 129 — Apron View rebuilt as an aerial-perspective SVG rather than
+// labelled boxes. This is an ORIGINAL rendering built from the real
+// spatial relationships described in the source emails/photos (flight
+// line grouped with SLG2/8KCAB, Skydiving apron and RVAC grass as a
+// separate area elsewhere on the field, New Bays as a third, distinct
+// area) — not a reproduction of the actual aerial photographs uploaded,
+// which are real photographs and shouldn't be re-embedded directly. Small
+// plane-icon glyphs are simple original shapes (fuselage + wing cross),
+// not traced from any real photo.
+const APRON_TYPE_COLOR={DA40:"var(--sky)",DA42:"var(--red)",C172:"var(--green)",SLG2:"var(--orange)",DECATHLON:"var(--amber)","DA40-3B":"var(--sky)"};
+function apronPlaneIcon(cx,cy,color,scale){
+  const s=scale||1;
+  return `<g transform="translate(${cx},${cy}) scale(${s})" opacity=".92">
+    <rect x="-3" y="-16" width="6" height="30" rx="2" fill="${color}"/>
+    <rect x="-15" y="-4" width="30" height="6" rx="2" fill="${color}"/>
+    <rect x="-8" y="10" width="16" height="4" rx="2" fill="${color}"/>
+  </g>`;
+}
+function apronSpotLabel(x,y,reg,sub){
+  return `<text x="${x}" y="${y}" text-anchor="middle" font-size="9.5" font-weight="700" fill="var(--ink)">${reg}</text>
+    ${sub?`<text x="${x}" y="${y+11}" text-anchor="middle" font-size="7.5" fill="var(--faint)">${sub}</text>`:""}`;
+}
+// Round 130 — Apron View locked for now, at direct request, matching the
+// same pattern already established for the whole Maintenance page's own
+// suspension (MAINT_SUSPENDED): a single flag, checked at render time,
+// with a clear "work in progress" message rather than removing the real
+// content or the toggle option itself. Flip APRON_LOCKED back to false to
+// re-enable when ready — no other change needed, the real rendering
+// underneath is untouched and ready to go.
+const APRON_LOCKED=true;
+function renderApronView(){
+  const el=$("#maintApron");
+  if(APRON_LOCKED){
+    el.innerHTML=`<div class="hint" style="padding:var(--u5) 0; text-align:center">
+      <div style="font-size:14px; font-weight:800; color:var(--amber); margin-bottom:var(--u2)">Apron View — Work in Progress</div>
+      <div>Still being refined before it's ready to rely on. Tile View has the current real fleet status.</div>
+    </div>`;
+    return;
+  }
+  const flightLine=APRON_LAYOUT.zones.find(z=>z.name==="Flight Line");
+  const slg2=APRON_LAYOUT.zones.find(z=>z.name==="SLG2 Apron");
+  const kcab=APRON_LAYOUT.zones.find(z=>z.name==="8KCAB Bay");
+  const sky=APRON_LAYOUT.zones.find(z=>z.name==="Skydiving Apron");
+  const rvac=APRON_LAYOUT.zones.find(z=>z.name==="RVAC Grass Parking");
+  const bays=APRON_LAYOUT.zones.find(z=>z.name==="New Bays");
+
+  const flSpots=flightLine.spots;
+  const flX=i=>90+i*95;
+  const flightLineSVG=flSpots.map((s,i)=>{
+    const x=flX(i);
+    if(s.type==="RESERVED"){
+      return `<rect x="${x-32}" y="304" width="64" height="46" rx="4" fill="none" stroke="var(--faint)" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="${x}" y="332" text-anchor="middle" font-size="8" fill="var(--faint)">reserved</text>`;
+    }
+    const color=APRON_TYPE_COLOR[s.type]||"var(--dim)";
+    if(s.reg==="Other DA40s"){
+      return `<rect x="${x-32}" y="304" width="230" height="46" rx="4" fill="${color}" opacity=".08" stroke="${color}" stroke-width="1.2"/>
+        ${apronPlaneIcon(x+15,325,color,0.9)}${apronPlaneIcon(x+80,325,color,0.9)}${apronPlaneIcon(x+145,325,color,0.9)}
+        <text x="${x+95}" y="345" text-anchor="middle" font-size="8" fill="var(--faint)">other DA40s, 5th spot onwards</text>`;
+    }
+    return `${apronPlaneIcon(x,322,color)}${apronSpotLabel(x,344,s.reg)}`;
+  }).join("");
+
+  el.innerHTML=`<div class="hint" style="margin-bottom:var(--u3)">Real parking assignments, laid out as an original schematic (not a reproduction of the actual aerial photos) — sourced directly from internal guidance, not a live feed. Source: ${APRON_LAYOUT.source}.</div>
+  <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); padding:var(--u3); overflow-x:auto">
+    <svg viewBox="0 0 900 600" style="width:100%; min-width:700px; height:auto; display:block">
+      <rect x="0" y="0" width="900" height="600" fill="#2b2f35"/>
+      <line x1="0" y1="290" x2="900" y2="290" stroke="#3a3f47" stroke-width="1"/>
+      <line x1="0" y1="360" x2="900" y2="360" stroke="#3a3f47" stroke-width="1"/>
+
+      <!-- SLG2 apron + 8KCAB bay, grouped with the flight line -->
+      <rect x="230" y="40" width="260" height="90" rx="4" fill="${APRON_TYPE_COLOR.SLG2}" opacity=".12" stroke="${APRON_TYPE_COLOR.SLG2}" stroke-width="1.5"/>
+      <text x="360" y="90" text-anchor="middle" font-size="13" font-weight="800" fill="${APRON_TYPE_COLOR.SLG2}">SLG2 APRON</text>
+      <text x="360" y="105" text-anchor="middle" font-size="8" fill="var(--faint)">moved clear of rocks before start-up/shutdown</text>
+      <rect x="510" y="40" width="120" height="90" rx="4" fill="${APRON_TYPE_COLOR.DECATHLON}" opacity=".12" stroke="${APRON_TYPE_COLOR.DECATHLON}" stroke-width="1.5"/>
+      <text x="570" y="90" text-anchor="middle" font-size="12" font-weight="800" fill="${APRON_TYPE_COLOR.DECATHLON}">8KCAB</text>
+
+      <!-- Flight line -->
+      <text x="20" y="230" font-size="11" font-weight="800" fill="var(--faint)">FLIGHT LINE</text>
+      ${flightLineSVG}
+
+      <!-- Skydiving apron + RVAC grass, a separate area of the field -->
+      <text x="20" y="400" font-size="11" font-weight="800" fill="var(--faint)">SKYDIVING APRON</text>
+      ${sky.spots[0].reg.split(" / ").map((r,i)=>`${apronPlaneIcon(70,430+i*55,APRON_TYPE_COLOR.C172)}${apronSpotLabel(70,455+i*55,r)}`).join("")}
+
+      <text x="220" y="400" font-size="11" font-weight="800" fill="var(--faint)">RVAC GRASS PARKING</text>
+      ${rvac.spots[0].reg.split(" / ").map((r,i)=>`${apronPlaneIcon(270,430+i*45,APRON_TYPE_COLOR.C172)}${apronSpotLabel(270,452+i*45,r)}`).join("")}
+
+      <!-- New bays, a third distinct area -->
+      <text x="620" y="400" font-size="11" font-weight="800" fill="var(--faint)">NEW BAYS</text>
+      ${bays.spots.map((s,i)=>`<rect x="${600+i*95}" y="420" width="80" height="60" rx="4" fill="none" stroke="${APRON_TYPE_COLOR["DA40-3B"]}" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="${640+i*95}" y="454" text-anchor="middle" font-size="10" font-weight="700" fill="${APRON_TYPE_COLOR["DA40-3B"]}">${s.label}</text>`).join("")}
+      <text x="620" y="500" font-size="8" fill="var(--faint)">for DA40 aircraft with 3-blade propellers</text>
+    </svg>
+  </div>
+  <div style="display:flex; gap:var(--u4); flex-wrap:wrap; margin-top:var(--u3); font-size:11px; color:var(--dim)">
+    ${Object.entries({DA40:"DA40",DA42:"DA42",C172:"C172",SLG2:"Sling 2",DECATHLON:"Decathlon"}).map(([k,label])=>
+      `<div style="display:flex; align-items:center; gap:5px"><span style="width:10px; height:10px; border-radius:2px; background:${APRON_TYPE_COLOR[k]}; display:inline-block"></span>${label}</div>`
+    ).join("")}
+  </div>
+  <div class="hint" style="margin-top:var(--u3)">${flightLine.spots.map(s=>s.note?`<div style="margin-bottom:4px"><b>${s.label}:</b> ${s.note}</div>`:"").join("")}</div>`;
+}
+document.querySelectorAll(".fleet-view-btn[data-fleetview]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".fleet-view-btn[data-fleetview]").forEach(b=>b.classList.toggle("active",b===btn));
+    const view=btn.dataset.fleetview;
+    $("#maintTiles").style.display=view==="tiles"?"":"none";
+    $("#maintApron").style.display=view==="apron"?"":"none";
+    if(view==="apron" && !$("#maintApron").innerHTML.trim()) renderApronView();
+  });
+});
+
+// Round 130 — visible separation between aircraft-type groups in Tile
+// View, using the same type-priority order established for sorting
+// (round 127) so the two stay consistent with each other by construction
+// rather than by coincidence. A group heading (spanning the full grid
+// width) is inserted wherever the type actually changes between one tile
+// and the next, rather than a fixed count per group — correct regardless
+// of how many tails happen to exist in each type at the time.
+const APRON_TYPE_GROUP_LABELS=["Diamond DA40","Cessna 172","Sling 2","Diamond DA42","Piper PA44 Seminole","Super Decathlon","Other"];
 function renderMaintTiles(){
-  $("#maintTiles").innerHTML=buildMaintTileList().map(a=>{
+  const list=buildMaintTileList();
+  let lastPriority=null;
+  $("#maintTiles").innerHTML=list.map(a=>{
     const isKai=a.reg===MAINT_AIRCRAFT.reg;
     const live=flFleetData[a.reg];
     const clickable=isKai||!!live;
@@ -2418,7 +2743,13 @@ function renderMaintTiles(){
       svg=tilePlanformSVG("empty");
       typeLine=flFleetLoaded?"Not found in FlightLogger":"No maintenance data";
     }
-    return `<div class="maint-tile${clickable?'':' disabled-tile'}" data-reg="${a.reg}">
+    const priority=mrFleetTypeSortPriority(a.type);
+    let groupHeader="";
+    if(priority!==lastPriority){
+      groupHeader=`<div style="grid-column:1/-1; ${lastPriority!==null?'margin-top:var(--u3); ':''}padding-bottom:var(--u1); border-bottom:1px solid var(--line); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--faint)">${APRON_TYPE_GROUP_LABELS[priority]}</div>`;
+      lastPriority=priority;
+    }
+    return `${groupHeader}<div class="maint-tile${clickable?'':' disabled-tile'}" data-reg="${a.reg}">
       ${svg}
       <div class="reg">${a.reg}</div>
       <div class="type">${typeLine}</div>
@@ -3186,6 +3517,12 @@ async function runLiveIntegrityCheck(c,i){
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
 const CHANGELOG=[
+  {v:"v0.119.0",d:"Fuel Plan's Taxi and Final Reserve now autofill from real, sourced SOP figures for whichever aircraft is selected, and Trip Fuel defaults to 60 minutes. Pulled directly from LTF's own SOP data (ltf-aircraft-sop-data.js, previously a reference file not yet wired into the app) — Taxi is a real fixed-litres figure per type (confirmed for DA40, C172R, C172S, Sling 2, PA44, and DA42; genuinely absent from the source for the Decathlon, which stays manual rather than guessed). Final Reserve's 30-minute day-VFR figure is a universal regulatory default (Exposition 2.2.1(4a), same citation already on this row) and always autofills; its litres conversion only autofills where the SOP gives a real, dedicated holding-rate figure for that type (confirmed for C172S, PA44, DA42) — DA40, C172R, Sling 2, and the Decathlon only have cruise-power settings in the source, no dedicated holding phase, so their reserve litres stays manual rather than assumed from an unrelated cruise figure. Trip Fuel's 60-minute default converts to litres via the existing burn-rate mechanism once a power setting is available, same as manually typing 60 always has. All three reset to the newly-selected aircraft's own real defaults on every aircraft change, same precedent already established for Endurance. Verified the exact figure for all seven aircraft types individually (not just spot-checked one), confirmed the litres math for every type with a real holding rate lines up exactly (12.0L for C172S, 35.5L for PA44, 15.0L for DA42 — all 30/60 × the sourced rate), and confirmed switching between aircraft correctly resets every field to the new type's own real numbers rather than carrying over the previous selection's values."},
+  {v:"v0.118.0",d:"Fixed the WAC/VNC/VTC chart toggle per direct feedback — two real problems, not one. First, these are now genuinely independent filters: any combination can be active at once (a shared CSS class, not mutually exclusive), each with its own colour. Second, each active chart type now draws a real, visible dashed outline directly on the map itself, nested by colour when multiple are active — not just descriptive text with nothing to actually look at. Found and fixed a real bug while verifying this: the map-drawing function (drawMap()) fully replaces the map SVG's content every time it runs — on initial load and on every route switch — which was silently wiping out the outline the instant it was drawn. Fixed by redrawing the active outlines at the end of drawMap() itself, not just once at page load, so they now correctly survive switching between routes. Verified directly: the default outline appears on load (it hadn't been), multiple outlines nest correctly when several filters are active simultaneously, all currently-active outlines survive a route change, and the info panel lists every active chart type together rather than just one."},
+  {v:"v0.117.0",d:"Three real changes. Apron View locked at direct request — a single flag (APRON_LOCKED), same pattern already established for the whole Maintenance page's own suspension, showing a clear 'work in progress' message instead of the real schematic while it's refined further; the underlying rendering is untouched and ready the moment it's flipped back. Tile View now shows visible section headers between aircraft-type groups (Diamond DA40, Cessna 172, Sling 2, Diamond DA42, Piper PA44 Seminole, Super Decathlon), inserted wherever the type actually changes between consecutive tiles rather than a fixed count — stays correct regardless of how many tails exist in each type. Nav Map gets a real WAC/VNC/VTC chart-type toggle, coverage information only — deliberately not an attempt to render actual chart imagery, which this app doesn't have and shouldn't fabricate. Sourced directly to CASA's own chart descriptions (scale, purpose, and use case for each); Moorabbin's real VNC edition (Melbourne/Deniliquin) is stated with confidence since it was directly confirmed, while WAC/VTC edition names for this specific area are honestly left unconfirmed rather than guessed. Found and fixed a real conflict before shipping: the new chart-toggle buttons initially shared the same CSS class as the Maintenance page's existing tile/apron toggle, and since this is a single-page app, both sets of buttons coexist in the DOM at once — without separating them, clicking one toggle would have interfered with the other. Verified all three independently: the apron lock correctly shows the WIP message and hides the real content, every real type-group label appears in the right place in Tile View, the chart toggle shows accurate info for all three chart types defaulting to WAC, and — checked directly, not assumed — clicking the chart toggle doesn't affect the Maintenance page's tile/apron state and vice versa."},
+  {v:"v0.116.0",d:"Apron View rebuilt as an aerial-perspective SVG rather than labelled boxes, at direct request. Same real data as before (nothing invented or changed), laid out to visually mirror the actual spatial relationships described in the source material: the flight line grouped together with SLG2 and 8KCAB nearby, the Skydiving Apron and RVAC Grass Parking shown as a genuinely separate area of the field, and the New Bays (AP009-011) as a third, distinct area — matching how the real airfield is actually organised, not just three equal-looking boxes in a row. Simple original plane-icon glyphs (a small fuselage-and-wing shape) mark each named registration, colour-coded by type with a legend. This is a built rendering, not a reproduction of the actual aerial photographs uploaded — those are real photographs and aren't re-embedded directly. Verified the SVG renders without errors, every real registration and zone from the source material is actually present in the output (not just assumed from the data object), no text element falls outside the drawing's own bounds, and the toggle between Tile View and Apron View still works correctly in both directions afterward."},
+  {v:"v0.115.0",d:"Added a real, sourced Apron View, toggleable against the Maintenance page's existing tile grid. Built directly from two internal emails — Hannah Burnett's 'Parking Sitch' guide (1 Apr 2025) for the flight-line/SLG2/8KCAB/Skydiving-apron/RVAC-grass assignments, and Kai Li's 'New Parking Bays' email for AP009-AP011 — not invented or guessed. Deliberately a built schematic (labelled zones and spots matching the real guidance) rather than a reproduction of the actual aerial photos attached to those emails, which are real photographs and shouldn't be re-embedded directly. Honest about the parts the source material doesn't specify: 'other DA40s' beyond the 5th flight-line spot are shown as a group, since the email only says '5th spot onwards' without giving further individual positions; AP009-011 are shown as available for 3-blade-prop DA40s generally, since the email doesn't name which specific tails have that propeller variant. Verified the toggle switches correctly both directions, defaults to the existing tile view (not a surprise change), and that every real assignment from the source material — every named registration, every zone, both new bays — actually appears correctly in the rendered view."},
+  {v:"v0.114.0",d:"Maintenance page's fleet tiles now default-sort by type: Diamond DA40 first, then Cessnas (172R/172S), then Sling 2, then Diamond DA42, then Piper PA44, then the Super Decathlon last — each group alphabetically sorted by registration within itself. Applied specifically to the tile grid's own display order, not FLEET's internal array order (which stays untouched, since it's still used elsewhere, e.g. the W&B aircraft selector). Matches by type substring rather than exact string, so VH-KAI (whose type is the distinct string 'DA40 IFR [LRT]', not 'Diamond DA40') still correctly groups with the rest of the DA40 fleet rather than falling through to 'unrecognised, sort last.' Verified the actual rendered order directly against the real 29-tile fleet, not just the sort function in isolation."},
   {v:"v0.113.0",d:"Extended the same real-persistence principle to Part 1's header fields — Maintenance Release No., expiry, issued-by, and the rest, plus the IFR/VFR Night/VFR Day checkboxes, per aircraft, via a new proxy endpoint (GET/PUT /mr1/:reg, same MR_DATA KV store as Part 2, different key prefix). One 'Save Part 1' action covers the whole header block together, rather than 14 separate buttons — that's a deliberate design choice, not a partial implementation: a Part 1 header describes one coherent release for one aircraft, filled in together, unlike Part 2's ongoing list of separate defect entries which each need their own save. Fields stay fully editable after saving; selecting a different aircraft correctly shows that aircraft's own saved data (or genuinely empty fields if nothing's been saved for it yet), and clicking Save again on the same aircraft updates the same record rather than creating a duplicate. Verified all three directly: saved values for one aircraft, confirmed a different aircraft showed empty fields rather than leaking the first one's data, then edited and re-saved the original aircraft's value and confirmed the update stuck rather than silently reverting."},
   {v:"v0.112.0",d:"Three real changes to the trial Maintenance Release Part 2 system. First, fixed the display order — Part 2 now genuinely sits between Part 1 and Part 3 in the page, always, for every aircraft. It previously lived in a completely different part of the page (the tile-click detail panel, above Part 1 entirely) because its container happened to be positioned there, not because of any deliberate ordering logic — moved it into a fixed container physically placed between the two static blocks, which is what actually fixes it, not just relabeling. Second, defect and rectification are now genuinely separate steps, matching how a real Maintenance Release Part 2 actually works — an endorsement and its clearing endorsement are recorded separately, often by different people with different licences. A defect can now be logged with just the defect and who reported it; the rectification and who rectified it can be added later, by someone else entirely, via a real 'Add rectification' action. Third, every entry can now be edited or deleted outright — real PATCH/DELETE endpoints on the proxy, not just create-and-forget. Verified all of it directly: the Part 1→2→3 order for both the generic and VH-KAI-specific views, a defect-only entry correctly showing 'Not yet rectified' until a real rectification is added by a different named person, editing changing the stored text and removing the old value, and deleting genuinely removing the entry rather than just hiding it."},
   {v:"v0.111.0",d:"Fixed a real consistency risk between the Home page's Live Data Integrity and the Maintenance page's own connection indicator — they were each making their own separate call to the exact same /fleet endpoint, meaning they could genuinely show different results from ordinary network timing alone, no bug required. Replaced both with a single shared connectivity check that every place reads from, so they can no longer structurally disagree — confirmed directly by counting actual network calls (exactly one /fleet request now, not two, across both pages together) rather than just checking the displayed text matched. Also corrected 'Aircraft Maintenance Data (FlightLogger),' per direct instruction: the underlying FlightLogger connection is genuinely real (the same one used everywhere else in the app), it's specifically the detailed parts/records sub-feature that's blocked by a permission boundary — now shows green/green/amber (connected, not fully integrated), the same honest pattern already used for ERSA/Airspace/CASA MOS, rather than a flat red implying nothing works at all. Verified both the success and failure cases stay consistent across both pages, not just the happy path."},
@@ -3581,6 +3918,14 @@ $("#fpTable").innerHTML=`<thead><tr><th></th><th class="num">Min</th><th class="
     <tr><td>Additional Fuel Components</td><td colspan="2"><input type="text" id="fpAdditionalNote" placeholder="What does the Additional row above cover?" style="text-align:left"></td></tr>
   </tbody>`;
 document.querySelectorAll('#fpTable input, #fpAc').forEach(el=>el.addEventListener("input",calcFuelPlan));
+// Applies the same SOP-sourced Taxi/Reserve/Trip defaults used on aircraft
+// change (see applySopFuelDefaults below) to whichever aircraft the Fuel
+// Plan starts on, so this doesn't only take effect after manually
+// re-selecting an aircraft once.
+(function initialFuelPlanDefaults(){
+  const ac=FLEET.find(f=>f.reg===fpAcSel.value);
+  if(ac) applySopFuelDefaults(ac);
+})();
 // Trip/Alternate/Contingency/Reserve/Holding/Additional convert bidirectionally
 // between MIN and LITRES once a burn rate is set (editing either field updates
 // the other) — per Nick's instruction. Climb (usually unused, disabled by
@@ -3692,12 +4037,47 @@ function syncAircraftSelection(reg,exceptSelId){
     calcFuelPlan();
   }
 }
+// Round 132 — real SOP-sourced autofill for Taxi and Final Reserve, plus a
+// 60-minute default for Trip Fuel, all keyed to whichever aircraft is
+// currently selected. Taxi and the Final Reserve litres figure only
+// autofill where the source SOP actually gives a confirmed number for
+// that type (ltf-aircraft-sop-data.js) — several types (DA40, C172R, SLG2,
+// and the Decathlon, which isn't in that source file at all) don't have a
+// dedicated holding rate given, so Final Reserve litres stays manual for
+// those rather than being guessed from an unrelated cruise setting. The
+// Final Reserve MIN figure (30 min day-VFR) is universal regardless of
+// type — Exposition 2.2.1(4a), same citation already in this row's hint.
+// Resets unconditionally on aircraft change, same precedent already
+// established for Endurance just below — selecting a different aircraft
+// is a deliberate action, and its own real defaults should apply, the same
+// way Endurance already resets to the new type's usable fuel regardless
+// of what the previous aircraft's value was.
+function applySopFuelDefaults(ac){
+  const type=AIRCRAFT_TYPES[ac.type];
+  const taxiL=$("#fp-taxi-l");
+  if(taxiL){
+    taxiL.value=type.taxiL??0;
+    taxiL.dataset.userSet="1";
+  }
+  const resM=$("#fp-reserve-m"), resL=$("#fp-reserve-l");
+  if(resM){ resM.value=30; resM.dataset.userSet="1"; }
+  if(resL){
+    resL.value=type.holdingLPerHr?(Math.ceil(30/60*type.holdingLPerHr*10)/10).toFixed(1):0;
+    resL.dataset.userSet="1";
+  }
+  const tripM=$("#fp-trip-m");
+  if(tripM){
+    tripM.value=60;
+    convertFuelRow("trip","m"); // computes litres via the existing Sub-Total burn-rate mechanism, once available
+  }
+}
 fpAcSel.addEventListener("change",()=>{
   // Reset Endurance-litres to this aircraft's usable fuel by default (actual fuel on board
   // at start-up per the handbook's step 6 — instructor can reduce if not filled to tabs).
   const ac=FLEET.find(f=>f.reg===fpAcSel.value);
   buildPowerSettings(AIRCRAFT_TYPES[ac.type]);
   $("#fp-endurance-l").value=ac.maxFuelL??"";
+  applySopFuelDefaults(ac);
   calcFuelPlan();
   syncAircraftSelection(fpAcSel.value,"#fpAc");
 });
@@ -3946,6 +4326,7 @@ function drawMap(){
     drawMap(); // re-render so the blank separator + repeated departure row appear/disappear
   }));
   updateQualNav();
+  updateChartOverlay(); // drawMap() replaces #map's whole innerHTML, so any active chart outline needs redrawing every time this runs, not just once at page load
 }
 function updateQualNav(){
   const fullStops=document.querySelectorAll(".fl-fullstop:checked").length;
