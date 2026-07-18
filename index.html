@@ -1284,7 +1284,16 @@ const AIRCRAFT_TYPES={
         ],
       },
     },
-    powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js).
+    // Source gives three real cruise points for this type (unlike most
+    // others' two), each labeled with its own real airspeed too — kept
+    // that detail in the label rather than dropping it. Converted from
+    // L/hr to this app's existing burnUSGH convention (÷3.78541).
+    powerSettings:[
+      {pct:42,label:"Slow cruise, 42% power (89kt)",burnUSGH:+(24/3.78541).toFixed(2),default:true},
+      {pct:61,label:"Normal cruise, 61% power (109kt)",burnUSGH:+(32/3.78541).toFixed(2)},
+      {pct:77,label:"Fast cruise, 77% power (120kt)",burnUSGH:+(40/3.78541).toFixed(2)},
+    ],
     // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js):
     // "Start/Taxi/Take-off" (5L, fixed) and "Holding" (24 L/hr) — both
     // explicitly given for this type, unlike several others in the fleet.
@@ -1348,7 +1357,12 @@ const AIRCRAFT_TYPES={
         ],
       },
     },
-    powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js) —
+    // given directly in USG/hr in the source for this type, used as-is.
+    powerSettings:[
+      {pct:65,label:"65% power",burnUSGH:7.5,default:true},
+      {pct:75,label:"75% power",burnUSGH:8.5},
+    ],
     // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
     // "Start/Taxi/Take-off" (2 USG). No dedicated Holding phase is given
     // for this type — only 75%/65% power cruise settings — so
@@ -1442,7 +1456,16 @@ const AIRCRAFT_TYPES={
         `,
       },
     },
-    powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js).
+    // Given as engine RPM settings in the source, not power percentages
+    // like every other type — `pct` here is just this option's internal
+    // matching key (see buildPowerSettings/fpPowerSetting), the actual RPM
+    // value is what's shown to the user via `label`, so this isn't
+    // mislabeled as a percentage anywhere in the UI.
+    powerSettings:[
+      {pct:4800,label:"4800 RPM @ 3000ft",burnUSGH:+(16/3.78541).toFixed(2),default:true},
+      {pct:5000,label:"5000 RPM @ 3000ft",burnUSGH:+(18/3.78541).toFixed(2)},
+    ],
     // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
     // "Start/Taxi/Take-off" (2L, fixed). No dedicated Holding phase given —
     // only "4800 RPM" and "5000 RPM" cruise settings — so holdingLPerHr is
@@ -1480,7 +1503,14 @@ const AIRCRAFT_TYPES={
         envelope:null, // not given anywhere in this source
       },
     },
-    powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js) —
+    // given directly in USG/hr in the source for this type, used as-is
+    // rather than converted from the L/hr figure (which is also given, and
+    // agrees closely: 86/78 L/hr against these USG/hr values × 3.78541).
+    powerSettings:[
+      {pct:65,label:"65% power (23in MAP / 2300 RPM)",burnUSGH:20.6,default:true},
+      {pct:75,label:"75% power (25in MAP / 2300 RPM)",burnUSGH:22.4},
+    ],
     // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
     // "Taxi (flight planning)" (10L, explicitly labeled for planning
     // purposes) and "Holding 55% (20in MAP / 2300 RPM)" (71 L/hr) — both
@@ -1513,7 +1543,15 @@ const AIRCRAFT_TYPES={
         envelope:null, // not given anywhere in this source
       },
     },
-    powerSettings:[],
+    // Real, sourced LTF SOP v4.0 Jan 2022 fuelFlow data (ltf-aircraft-sop-data.js).
+    // Source gives these directly in L/hr, not USG/hr like DA40's — converted
+    // here for consistency with this app's existing burnUSGH convention
+    // (÷3.78541), so the same Fuel Plan conversion logic works unchanged
+    // regardless of which unit the original SOP entry happened to use.
+    powerSettings:[
+      {pct:65,label:"65% power (normal cruise)",burnUSGH:+(37/3.78541).toFixed(2),default:true},
+      {pct:75,label:"75% power (fast cruise)",burnUSGH:+(43/3.78541).toFixed(2)},
+    ],
     // Real, sourced LTF SOP v4.0 Jan 2022 (ltf-aircraft-sop-data.js):
     // "Taxi" (5L, fixed) and "Holding (55% power)" (30 L/hr) — both
     // confirmed available for this type.
@@ -2180,7 +2218,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.119.0";
+const VERSION="v0.120.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -3517,6 +3555,7 @@ async function runLiveIntegrityCheck(c,i){
 INTEGRITY_CHECKS.forEach((c,i)=>runLiveIntegrityCheck(c,i));
 
 const CHANGELOG=[
+  {v:"v0.120.0",d:"Fuel Plan's power-setting/burn-rate picker is now real for every aircraft type in the fleet, not just the DA40. Pulled directly from LTF's own SOP data (ltf-aircraft-sop-data.js) — C172R (65%/75% power), C172S (three real cruise points: 42%/61%/77%, each with its real airspeed kept in the label), Sling 2 (4800/5000 RPM — labeled as RPM, not power percentage, since that's genuinely what the source gives for this type), PA44 (65%/75% power, using the source's own directly-given USG/hr figures rather than converting), and DA42 (65%/75% power). Figures given in L/hr in the source were converted to this app's existing USG/hr convention for consistency, so the same Fuel Plan math works unchanged regardless of which unit the original SOP entry happened to use. The Decathlon stays exactly as it was — genuinely no fuelFlow data exists for it anywhere in the source, so its picker honestly shows 'No power-setting data yet' rather than a fabricated figure. Verified every type's dropdown directly against hand-calculated conversions (all six matched exactly), and confirmed the full Trip Fuel conversion chain now works end-to-end for a previously-unpowered type (C172S: 60 min at its default 42% slow-cruise rate correctly computes to exactly 24.0L)."},
   {v:"v0.119.0",d:"Fuel Plan's Taxi and Final Reserve now autofill from real, sourced SOP figures for whichever aircraft is selected, and Trip Fuel defaults to 60 minutes. Pulled directly from LTF's own SOP data (ltf-aircraft-sop-data.js, previously a reference file not yet wired into the app) — Taxi is a real fixed-litres figure per type (confirmed for DA40, C172R, C172S, Sling 2, PA44, and DA42; genuinely absent from the source for the Decathlon, which stays manual rather than guessed). Final Reserve's 30-minute day-VFR figure is a universal regulatory default (Exposition 2.2.1(4a), same citation already on this row) and always autofills; its litres conversion only autofills where the SOP gives a real, dedicated holding-rate figure for that type (confirmed for C172S, PA44, DA42) — DA40, C172R, Sling 2, and the Decathlon only have cruise-power settings in the source, no dedicated holding phase, so their reserve litres stays manual rather than assumed from an unrelated cruise figure. Trip Fuel's 60-minute default converts to litres via the existing burn-rate mechanism once a power setting is available, same as manually typing 60 always has. All three reset to the newly-selected aircraft's own real defaults on every aircraft change, same precedent already established for Endurance. Verified the exact figure for all seven aircraft types individually (not just spot-checked one), confirmed the litres math for every type with a real holding rate lines up exactly (12.0L for C172S, 35.5L for PA44, 15.0L for DA42 — all 30/60 × the sourced rate), and confirmed switching between aircraft correctly resets every field to the new type's own real numbers rather than carrying over the previous selection's values."},
   {v:"v0.118.0",d:"Fixed the WAC/VNC/VTC chart toggle per direct feedback — two real problems, not one. First, these are now genuinely independent filters: any combination can be active at once (a shared CSS class, not mutually exclusive), each with its own colour. Second, each active chart type now draws a real, visible dashed outline directly on the map itself, nested by colour when multiple are active — not just descriptive text with nothing to actually look at. Found and fixed a real bug while verifying this: the map-drawing function (drawMap()) fully replaces the map SVG's content every time it runs — on initial load and on every route switch — which was silently wiping out the outline the instant it was drawn. Fixed by redrawing the active outlines at the end of drawMap() itself, not just once at page load, so they now correctly survive switching between routes. Verified directly: the default outline appears on load (it hadn't been), multiple outlines nest correctly when several filters are active simultaneously, all currently-active outlines survive a route change, and the info panel lists every active chart type together rather than just one."},
   {v:"v0.117.0",d:"Three real changes. Apron View locked at direct request — a single flag (APRON_LOCKED), same pattern already established for the whole Maintenance page's own suspension, showing a clear 'work in progress' message instead of the real schematic while it's refined further; the underlying rendering is untouched and ready the moment it's flipped back. Tile View now shows visible section headers between aircraft-type groups (Diamond DA40, Cessna 172, Sling 2, Diamond DA42, Piper PA44 Seminole, Super Decathlon), inserted wherever the type actually changes between consecutive tiles rather than a fixed count — stays correct regardless of how many tails exist in each type. Nav Map gets a real WAC/VNC/VTC chart-type toggle, coverage information only — deliberately not an attempt to render actual chart imagery, which this app doesn't have and shouldn't fabricate. Sourced directly to CASA's own chart descriptions (scale, purpose, and use case for each); Moorabbin's real VNC edition (Melbourne/Deniliquin) is stated with confidence since it was directly confirmed, while WAC/VTC edition names for this specific area are honestly left unconfirmed rather than guessed. Found and fixed a real conflict before shipping: the new chart-toggle buttons initially shared the same CSS class as the Maintenance page's existing tile/apron toggle, and since this is a single-page app, both sets of buttons coexist in the DOM at once — without separating them, clicking one toggle would have interfered with the other. Verified all three independently: the apron lock correctly shows the WIP message and hides the real content, every real type-group label appears in the right place in Tile View, the chart toggle shows accurate info for all three chart types defaulting to WAC, and — checked directly, not assumed — clicking the chart toggle doesn't affect the Maintenance page's tile/apron state and vice versa."},
