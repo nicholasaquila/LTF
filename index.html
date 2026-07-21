@@ -649,9 +649,9 @@ c212 0 367 -4 371 -9 5 -9 -19 -194 -30 -222 -3 -8 -9 -41 -14 -74 -5 -33 -17
       <button data-v="home" class="active">Home</button>
       <button data-v="signout">Solo Signout</button>
       <button data-v="maintenance">Maintenance <span class="demo-tag">[demo only]</span></button>
-      <button data-v="fatigue">Fatigue &amp; Duty</button>
-      <button data-v="scheduling">Scheduling</button>
-      <button data-v="ymmb" id="ymmbNavBtn">Management Briefing</button>
+      <button data-v="scheduling">Scheduling <span class="demo-tag">[demo only]</span></button>
+      <button data-v="fatigue">Fatigue &amp; Duty <span class="demo-tag">[demo only]</span></button>
+      <button data-v="ymmb" id="ymmbNavBtn">Management Briefing <span class="demo-tag">[demo only]</span></button>
     </nav>
     <div class="userchip"><span class="dot"></span> Instructor · prototype</div>
   </header>
@@ -2351,7 +2351,7 @@ window.addEventListener("load",()=>{
   setTimeout(()=>{$("#splash").classList.add("gone"); $("#app").classList.add("on"); document.body.style.overflow="auto";}, 2500);
 });
 
-const VERSION="v0.125.0";
+const VERSION="v0.126.0";
 // Tabs requiring repeated clicks before they actually navigate — every
 // view except Home and Solo Signout. Greyed out the whole time (matches
 // the app's existing disabled-state look elsewhere, opacity .4/cursor
@@ -2361,7 +2361,7 @@ const VERSION="v0.125.0";
 // reaches the required count it unlocks for the rest of the session
 // (in-memory only, resets on reload — same as everything else in this
 // app, no persistent storage).
-const GATED_TABS=["ymmb","scheduling"];
+const GATED_TABS=["ymmb","scheduling","fatigue"];
 const GATE_CLICKS_REQUIRED=6;
 const tabClickCounts={};
 const tabUnlocked=new Set();
@@ -3946,6 +3946,7 @@ loadDutyLog();
 loadForm16();
 
 const CHANGELOG=[
+  {v:"v0.126.0",d:"Nav reordered — Fatigue & Duty now sits after Scheduling, not before it. Fatigue & Duty is now gated behind the same 6-click requirement as Scheduling and Management Briefing, rather than open access. Every gated tab now carries a '[demo only]' tag directly in its label — Scheduling and Management Briefing didn't have one before, only Maintenance did; all three gated tabs are now consistent. Maintenance itself is unaffected — still unlocked, single-click, unchanged."},
   {v:"v0.125.0",d:"New Fatigue & Duty tab, built directly from LTF's real Fatigue Management System v5.0 (Oct 2022) — not invented. Log a duty period (FDP start/end, flight time, and the real modifiers from the source — Grade 3 <50hrs instruction, 3+ continuous circuits, 2+ instrument flying training flights) and it's checked against the actual FDP/flight-time limit tables (§1.8.5 Tables 1-3), including the awkward midnight-wrapping 2300-0459 band and Table 2's 'no operations to start' block for Grade 3 instructors in that band. A real discrepancy exists in the source document itself between §1.8.3's flight-time table (shows 7hrs uniformly) and §1.8.5's Table 1 (shows 6hrs specifically for the 2300-0459 band) — used Table 1 as authoritative and flagged the discrepancy directly rather than silently picking one. Circuit and instrument-training modifiers stack (both together = -2hrs) as the more conservative reading where the source doesn't explicitly address what happens if both apply — flagged as an interpretive choice, not a stated rule. Cumulative limits (28-day/365-day flight time, 7-day/14-day duty) are computed as real rolling sums against the entered log; the 6-days-off-per-28-days figure is honestly labelled as an approximation (counts calendar days with no logged entry, not a verified continuous off-duty period) rather than presented with false precision. Also built a real Form 16 occurrence report form, matching §1.7's actual trigger conditions and the 72-hour sleep history requirement. Single-person tool for now, though the underlying proxy endpoints (GET/POST/PATCH/DELETE /fatigue/duty/:person and /fatigue/reports/:person) are already multi-person-capable if that's needed later — reuses the existing MR_DATA KV store under new key prefixes rather than requiring another namespace. Verified the limit-calculation logic against 8 hand-calculated test cases covering every table, the midnight wrap in both directions, both modifiers individually and stacked, and the Grade 3 blocked-band case — all matched exactly. Verified the full duty-log and Form 16 workflows end to end (log, exceed, cumulative math, delete, submit) against a simulated backend."},
   {v:"v0.124.0",d:"Maintenance tab unlocked — removed from the 6-click gated list, now opens on a single click same as Home/Solo Signout (Scheduling and Management Briefing remain gated, unaffected). Marked clearly as [demo only] in the nav label itself, and a momentary amber toast now fires every time the tab is opened, fading out after 2.5 seconds — checked directly that it fires only for Maintenance and not for any other tab, and that it correctly reappears on every subsequent visit, not just the first."},
   {v:"v0.123.0",d:"Multi-stage Fuel Plan, synced to the selected Nav route — a genuine architectural addition, built alongside (not replacing) the existing single-stage system, which still runs exactly as before whenever the new 'Sync stages with selected Nav route' toggle is off. Touch-and-go is now tracked as its own real state on the Flight Log, separate from Full Stop — previously the two were treated identically ('not a full-stop'), but a multi-stage plan needs to know which waypoints are actual landing events (full-stop OR touch-and-go, both end one stage and start the next) versus a simple overfly that never touches down. Checkboxes are mutually exclusive. When sync is on, the Fuel Plan splits into one complete stage per landing event, each a full independent fuel calculation (its own Climb/Trip/Alternate/Contingency/Reserve/Holding/Additional/Taxi). Endurance carries forward automatically between stages, per direct confirmation: each stage's starting endurance defaults to the previous stage's Fuel Margin PLUS its Final Reserve litres — not margin alone, since reserve fuel isn't actually burned in normal operations, so margin+reserve is the real fuel remaining on board. Every carried-forward figure stays fully overridable (e.g. an actual refuel at the stop) and is never silently overwritten once touched directly, same discipline as everywhere else in this checker. Found and fixed two real bugs before shipping: manually editing a later stage's endurance wasn't being marked as user-set, so an earlier stage's edit would silently overwrite the manual figure again; and stage tables were being built and calculated in the same pass, so an earlier stage's cascade tried to write into a later stage's endurance field before that field existed yet, silently no-opping and leaving every stage after the first sitting at a false 0L endurance. Verified extensively: the existing single-stage path is completely unaffected with sync off; 2-stage and 3-stage splits both produce the exact right number of stages with correct From/To labels; the carry-forward math was checked by hand at every step of a 3-stage chain and matched exactly; a manual override on a later stage correctly survives an edit to an earlier one; and the overall multi-stage verdict correctly reflects real calculated defaults rather than false-failing before any manual entry."},
